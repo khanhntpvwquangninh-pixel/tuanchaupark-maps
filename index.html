@@ -339,6 +339,9 @@ let _dcl=0;function declutterSoon(){cancelAnimationFrame(_dcl);_dcl=requestAnima
 // sample points along every drawn walkway and road (world coords), used to keep labels off the paths
 let _pathPts=null;function pathPts(){if(_pathPts)return _pathPts;const out=[];const add=a=>{for(let i=0;i+3<a.length;i+=2){const x0=a[i],y0=a[i+1],x1=a[i+2],y1=a[i+3],n=Math.max(1,Math.ceil(Math.hypot(x1-x0,y1-y0)/2.5));for(let j=0;j<=n;j++)out.push(x0+(x1-x0)*j/n,-(y0+(y1-y0)*j/n))}};
   WALK.forEach(([st,a])=>{if(st!==6)add(a)});BASE.lines.forEach(l=>add(l[2]));return _pathPts=new Float32Array(out)}
+// names placed above the picture (e.g. the wooden playground, so its name sits by Playzone and not by the restroom building below it)
+const LABEL_ABOVE=['san-go'];
+const ICON_AR={};
 function declutter(){
   const vis=(e,v)=>{e.style.visibility=v?'':'hidden'};
   const R=e=>{const r=e.getBoundingClientRect();return r.width?r:null};
@@ -352,18 +355,21 @@ function declutter(){
   const pins=[...gUser.querySelectorAll('.um:not(.keep)')];
   [...iconLbl.map(x=>x[0]),...pins,...lblEls].forEach(e=>vis(e,1));
   const kept=[];document.querySelectorAll('.zoom .btn,.legend,.coord').forEach(b=>{const r=R(b);if(r)kept.push(r)});
+  // WC signs are always shown (guests look for them first); everything else is placed around them
+  const wcPins=pins.filter(m=>m._wc);wcPins.forEach(m=>{const r=R(m);if(r)kept.push(r)});
   // 1) attraction names, biggest first: try under the picture, a bit lower, then above it; skip spots on a path or another label
   const picsAll=[];if(typeof IC!=='undefined')IC.forEach(g=>{const im=g.querySelector('image');const r=im&&R(im);if(r)picsAll.push([g,r])});
   iconLbl.forEach(([t,,g])=>{const k=g._k||1;const im=g.querySelector('image');const ir=im&&R(im);const ph=ir?ir.height:40;
     const others=picsAll.filter(([h])=>h!==g&&h._name!==g._name).map(x=>x[1]),notOwn=picsAll.filter(([h])=>h!==g).map(x=>x[1]);
     // stay close under the picture; nudge down or sideways to clear paths and other labels
-    const cands=[[0,11],[0,-ph-3]];let ok=null,first=null;
-    for(const strict of [true,false]){for(const [dx,dy] of cands){t.setAttribute('x',dx/k);t.setAttribute('y',dy/k);const r=R(t);if(!r)break;if(!first)first=r;if(!hit(r,kept)&&!hit(r,dy<0?notOwn:others,-8)&&(!strict||!onPath(r))){ok=r;break}}if(ok)break}
+    const ar=Math.min(1,ICON_AR[g._f]||1),up=-(100*ar*k)-4;// screen px from the picture's base to just above its top
+    const cands=LABEL_ABOVE.includes(g._f)?[[0,up],[0,11]]:[[0,11],[0,up]];let ok=null,first=null;
+    for(const strict of [true,false]){for(const [dx,dy] of cands){t.setAttribute('x',dx/k);t.setAttribute('y',dy/k);const r=R(t);if(!r)break;if(!first)first=r;const pinned=LABEL_ABOVE.includes(g._f)&&dy<0;if(!hit(r,kept)&&(pinned||!hit(r,dy<0?notOwn:others,-8))&&(pinned||!strict||!onPath(r))){ok=r;break}}if(ok)break}
     if(ok){kept.push(ok);return}
     // no clean spot: keep the default place if it at least avoids other labels (the white halo keeps it readable over a path)
     t.setAttribute('x',0);t.setAttribute('y',11/k);if(first&&!hit(first,kept)){kept.push(first);return}vis(t,0)});
   // 2) pins only where they don't cover an attraction name or another pin
-  pins.forEach(m=>{const r=R(m);if(!r)return;if(hit(r,kept,1))vis(m,0);else kept.push(r)});
+  pins.forEach(m=>{if(m._wc)return;const r=R(m);if(!r)return;if(hit(r,kept,1))vis(m,0);else kept.push(r)});
   // 3) area names last: off the pictures, off other labels and off the paths
   const pics=[];if(typeof IC!=='undefined')IC.forEach(g=>{const im=g.querySelector('image');const r=im&&R(im);if(r)pics.push(r)});
   lblEls.forEach(t=>{if(t.style.display==='none')return;const r=R(t);if(!r)return;if(hit(r,kept)||hit(r,pics,-6)||(t._L.s<15&&onPath(r)))vis(t,0);else kept.push(r)})}
@@ -379,7 +385,8 @@ function apply(){
   {const w=Math.min(5,Math.max(2.4,1.9/view.s));gWalk.querySelectorAll('.wfill').forEach(e=>e.setAttribute('stroke-width',w));gWalk.querySelectorAll('.wcase').forEach(e=>e.setAttribute('stroke-width',w+2.4));{const v=Math.min(26,Math.max(9,6.5/view.s));world.querySelectorAll('.zebra').forEach(e=>{const M=e.getScreenCTM();const P=e.points;let p=4;if(M&&P.length>1){const q=P.getItem(0),r=P.getItem(P.numberOfItems-1);const L=Math.hypot(M.a*(r.x-q.x)+M.c*(r.y-q.y),M.b*(r.x-q.x)+M.d*(r.y-q.y));p=L/11}e.setAttribute('stroke-width',Math.max(v*.9,9));e.setAttribute('stroke-dasharray',p+' '+p)});gWalk.querySelectorAll('.vroad').forEach(e=>{e.setAttribute('stroke-width',v*e.dataset.f);if(e.classList.contains('vlane')){e.setAttribute('stroke-dasharray',(v*.45)+' '+(v*.35));}})}gWalk.querySelectorAll('.wrain').forEach(e=>e.setAttribute('stroke-width',(w*2+2)*(6-e.dataset.i)/6))}
   svg.classList.toggle('far',view.s>0.62);
   lblEls.forEach(t=>{const L=t._L;t.setAttribute('font-size',Math.max(L.s*Math.min(1,0.6/view.s+0.4),12*view.s));t.style.strokeWidth=3*view.s;t.style.display=((k>=L.minK*0.8||L.minK===0)&&(!L.maxK||k<L.maxK))?'':'none'});
-  document.querySelectorAll('.um').forEach(m=>m.setAttribute('transform',`translate(${m._x} ${-m._y}) ${UP} scale(${view.s})`));
+  const wcK=Math.min(1,Math.max(0.6,0.3/view.s));
+  document.querySelectorAll('.um').forEach(m=>m.setAttribute('transform',`translate(${m._x} ${-m._y}) ${UP} scale(${view.s*(m._wc?wcK:1)})`));
   {const fs=LBL_FS();document.querySelectorAll('.um .mt').forEach(t=>t.setAttribute('font-size',fs+0.5))}
   gDraft.querySelectorAll('circle').forEach(c=>c.setAttribute('r',4*view.s));if(typeof zoneLabels==='function'&&ZL.length)zoneLabels();if(typeof iconScale==='function'&&IC.length)iconScale();declutterSoon();
   // scale bar
@@ -557,7 +564,7 @@ function setMode(m){mode=m;if($('info-rename'))$('info-rename').hidden=m!=='poin
 let pendEl=null;
 function drawPending(){if(pendEl){pendEl.remove();pendEl=null}if(!pending)return;pendEl=marker(pending.x,pending.y,'#e2512b','+');$('pt-hint').textContent=`Vị trí đã chọn: ${toLL(pending.x,pending.y).join(', ')}. Đặt tên và bấm Lưu điểm.`}
 function marker(x,y,color,glyph,title,check,idx){const g=el('g',{class:'um'},gUser);g._x=x;g._y=y;g._idx=idx;g.style.cursor='pointer';
-  if(glyph==='WC'){// restroom: blue square sign with man and woman figures, the symbol guests already know
+  if(glyph==='WC'){g._wc=1;// restroom: blue square sign with man and woman figures, the symbol guests already know
     el('rect',{x:-11,y:-24,width:22,height:22,rx:4,fill:'#1e6fd9',stroke:'#fff','stroke-width':1.6},g);
     el('path',{d:'M0 -2 L-3 2 L3 2 Z',fill:'#1e6fd9',stroke:'#fff','stroke-width':1.2,'stroke-linejoin':'round'},g);
     el('rect',{x:-10,y:-3.2,width:20,height:2,fill:'#1e6fd9'},g);
@@ -640,11 +647,11 @@ function nearestEdge(x,y,noStair){let best=null;
   for(let u=0;u<G.adj.length;u++)for(const [v,w,st] of G.adj[u]){if(v<u&&G.adj[v].some(e=>e[0]===u))continue;if(noStair&&st===1)continue;if(st===8&&w<0.01)continue;if(st===3)continue;
     const [x0,y0]=G.xy[u],[x1,y1]=G.xy[v],dx=x1-x0,dy=y1-y0,L2=dx*dx+dy*dy||1;const t=Math.max(0,Math.min(1,((x-x0)*dx+(y-y0)*dy)/L2));const qx=x0+t*dx,qy=y0+t*dy,d=Math.hypot(x-qx,y-qy);
     const dd=d+(st===7?25:0);if(!best||dd<best.dd)best={u,v,t,q:[qx,qy],d,dd,len:Math.sqrt(L2),two:G.adj[v].some(e=>e[0]===u)}}return best}
-function routeBetween(a,b,noStair){const n=G.xy.length,D=new Float64Array(n).fill(Infinity),Pv=new Int32Array(n).fill(-1),done=new Uint8Array(n);
+function routeBetween(a,b,noStair,pen){const n=G.xy.length,D=new Float64Array(n).fill(Infinity),Pv=new Int32Array(n).fill(-1),done=new Uint8Array(n);
   // sources: the two ends of the start edge (only the forward end if that edge is one-way)
   D[a.v]=(1-a.t)*a.len;if(a.two)D[a.u]=a.t*a.len;
   for(;;){let u=-1,bd=Infinity;for(let i=0;i<n;i++)if(!done[i]&&D[i]<bd){bd=D[i];u=i}if(u<0)break;done[u]=1;
-    for(const [v,w,st] of G.adj[u]){if(noStair&&st===1)continue;const nd=bd+w;if(nd<D[v]){D[v]=nd;Pv[v]=u}}}
+    for(const [v,w,st] of G.adj[u]){if(noStair&&st===1)continue;const nd=bd+w*(pen&&pen.has(u<v?u+','+v:v+','+u)?4:1);if(nd<D[v]){D[v]=nd;Pv[v]=u}}}
   // same edge, walking straight along it
   let bestLen=Infinity,end=-1,direct=false;
   if((a.u===b.u&&a.v===b.v)&&(b.t>=a.t||a.two)){bestLen=Math.abs(b.t-a.t)*a.len;direct=true}
@@ -653,7 +660,11 @@ function routeBetween(a,b,noStair){const n=G.xy.length,D=new Float64Array(n).fil
   if(b.two){const cv=D[b.v]+(1-b.t)*b.len;if(cv<bestLen){bestLen=cv;end=b.v;direct=false}}
   if(!isFinite(bestLen))return null;
   const nodes=[];if(!direct)for(let v=end;v!==-1;v=Pv[v])nodes.push(v);nodes.reverse();
-  return {len:bestLen,nodes}}
+  // real walking length (penalties only steer the alternative, they are not distance)
+  let real=0;if(nodes.length){real+=Math.hypot(a.q[0]-G.xy[nodes[0]][0],a.q[1]-G.xy[nodes[0]][1])+Math.hypot(b.q[0]-G.xy[nodes[nodes.length-1]][0],b.q[1]-G.xy[nodes[nodes.length-1]][1]);for(let i=1;i<nodes.length;i++)real+=Math.hypot(G.xy[nodes[i]][0]-G.xy[nodes[i-1]][0],G.xy[nodes[i]][1]-G.xy[nodes[i-1]][1])}else real=bestLen;
+  return {len:real,nodes}}
+const edgeKey=(u,v)=>u<v?u+','+v:v+','+u;
+let routeAlt=0;// 0 = shortest shown, 1 = the other way shown
 function drawRoute(keepView){gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteGhost.innerHTML='';gWalkGhost.style.display='';const sum=$('r-sum');
   let A=state.points[rFrom];const B=state.points[rTo];
   if(rFrom===-2){if(!B){sum.textContent='Chọn điểm đến để xem đường đi.';return}
@@ -665,11 +676,22 @@ function drawRoute(keepView){gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteG
   const [ax,ay]=A.entry?fromLL(...A.entry):fromLL(A.lat,A.lon),[bx,by]=B.entry?fromLL(...B.entry):fromLL(B.lat,B.lon);
   // optional "via" points (e.g. a show entered only through its ticket gate)
   const stops=[[ax,ay]];(B.via||[]).forEach(n=>{const p=state.points.find(q=>q.name===n);if(p&&p!==A)stops.push(fromLL(p.lat,p.lon))});stops.push([bx,by]);
-  let total=0,line=[],first=null,last=null;
-  for(let k=1;k<stops.length;k++){const ea=nearestEdge(...stops[k-1],noStair),eb=nearestEdge(...stops[k],noStair);if(!ea||!eb){line=null;break}
-    const r=routeBetween(ea,eb,noStair);if(!r){line=null;break}
-    if(k===1)first=ea;last=eb;total+=r.len;line=line.concat([ea.q,...r.nodes.map(i=>G.xy[i]),eb.q])}
-  if(!line){sum.innerHTML='Không tìm được đường đi phù hợp. <small>Thử bỏ chọn “tránh cầu thang”.</small>';return}
+  // plan the shortest way, then another way that avoids most of it (penalised 4x), offered as a second option
+  const plan=pen=>{let total=0,line=[],first=null,last=null,keys=[];
+    for(let k=1;k<stops.length;k++){const ea=nearestEdge(...stops[k-1],noStair),eb=nearestEdge(...stops[k],noStair);if(!ea||!eb)return null;
+      const r=routeBetween(ea,eb,noStair,pen);if(!r)return null;if(k===1)first=ea;last=eb;total+=r.len;line=line.concat([ea.q,...r.nodes.map(i=>G.xy[i]),eb.q]);
+      for(let i=1;i<r.nodes.length;i++)keys.push(edgeKey(r.nodes[i-1],r.nodes[i]))}
+    return {total,line,first,last,keys}};
+  const best=plan(null);if(!best){sum.innerHTML='Không tìm được đường đi phù hợp. <small>Thử bỏ chọn “tránh cầu thang”.</small>';return}
+  let alt=plan(new Set(best.keys));
+  if(alt){const ks=new Set(best.keys);const shared=alt.keys.filter(k=>ks.has(k)).length;
+    if(!alt.keys.length||shared/alt.keys.length>0.7||alt.total>best.total*1.8+80||alt.total-best.total<15)alt=null}
+  if(!alt)routeAlt=0;
+  const main=routeAlt&&alt?alt:best,other=routeAlt&&alt?best:alt;
+  let {total,line,first,last}=main;
+  if(other){const of=other.line.flat();el('polyline',{points:pts(of),fill:'none',stroke:'#ffffff','stroke-width':9,'stroke-linecap':'round','stroke-linejoin':'round','vector-effect':'non-scaling-stroke'},gRoute);
+    el('polyline',{points:pts(of),fill:'none',stroke:'#8ab4f8','stroke-width':3,'stroke-dasharray':'0.1 6','stroke-linecap':'round','vector-effect':'non-scaling-stroke'},gRouteGhost);
+    el('polyline',{class:'ralt',points:pts(of),fill:'none',stroke:'#8ab4f8','stroke-width':5,'stroke-linecap':'round','stroke-linejoin':'round','vector-effect':'non-scaling-stroke',style:'cursor:pointer'},gRoute)}
   const flat=line.flat();
   // dotted legs: from you to the walkway, and from the walkway to the door of the place
   const dot=(p,q)=>{if(Math.hypot(p[0]-q[0],p[1]-q[1])<2)return;el('polyline',{points:pts([p[0],p[1],q[0],q[1]]),fill:'none',stroke:css('--route'),'stroke-width':3.5,'stroke-dasharray':'0.1 7','stroke-linecap':'round','vector-effect':'non-scaling-stroke'},gRoute)};
@@ -693,11 +715,14 @@ function drawRoute(keepView){gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteG
   const esc=t=>t.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   let html=`<b>${m} m</b> · khoảng ${Math.max(1,Math.round(m/WALK_SPEED))} phút đi bộ`+(usesStair?' <small>· có đoạn cầu thang</small>':'');
   if(passed.length)html+=`<br><small>Đi qua: ${passed.map(x=>esc(x[1])).join(' → ')}</small>`;
+  if(other){const om=Math.max(10,Math.round((other.total+off)/10)*10);
+    html+=`<br><button class="btn" id="r-swap" style="margin-top:6px;padding:6px 10px">${routeAlt?'↩ Về đường ngắn nhất':'Đường khác'}: ${om} m · ${Math.max(1,Math.round(om/WALK_SPEED))} phút</button> <small>(nét xanh nhạt trên bản đồ)</small>`}
   if(A.me&&Math.hypot(ax-bx,ay-by)<20)html='<b>Bạn đã đến nơi.</b>';
-  sum.innerHTML=html;
+  sum.innerHTML=html;const sw=document.getElementById('r-swap');if(sw)sw.onclick=()=>{routeAlt=routeAlt?0:1;drawRoute(true)};
+  gRoute.querySelectorAll('.ralt').forEach(e=>e.addEventListener('click',()=>{routeAlt=routeAlt?0:1;drawRoute(true)}));
   if(!keepView)frameW(flat.concat([ax,ay,bx,by]),40,0.3)}
-$('r-from').onchange=e=>{rFrom=+e.target.value;drawRoute()};
-$('r-to').onchange=e=>{rTo=+e.target.value;drawRoute()};
+$('r-from').onchange=e=>{routeAlt=0;rFrom=+e.target.value;drawRoute()};
+$('r-to').onchange=e=>{routeAlt=0;rTo=+e.target.value;drawRoute()};
 $('r-nostair').onchange=drawRoute;
 $('info-to').onclick=()=>{rTo=sel;if(meFix&&rFrom!==-2){const [mx,my]=fromLL(meFix[0],meFix[1]);if(Math.hypot(mx-900,my-800)<1500)rFrom=-2}fillRouteSelects();drawRoute()};
 $('info-from').onclick=()=>{rFrom=sel;fillRouteSelects();drawRoute()};
@@ -710,6 +735,7 @@ let tt;function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on'
 // final layer order: route under the 3D pictures, then the dotted path trace, names, route pins and the guest's dot on top
 const gRouteGhost=el('g',{'pointer-events':'none'});
 [gRoute,gIcon,gWalkGhost,gRouteGhost,gIconLbl,gRoutePins,gUser].forEach(g=>world.appendChild(g));
+Object.entries(ICON_SRC).forEach(([f,src])=>{const im=new Image();im.onload=()=>{ICON_AR[f]=im.naturalHeight/im.naturalWidth;declutterSoon()};im.src=src});
 requestAnimationFrame(()=>{drawZones();drawIcons();fit();render();rFrom=Math.max(0,state.points.findIndex(p=>p.name==='Quầy vé'));fillRouteSelects()});
 </script>
 
