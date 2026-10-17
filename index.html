@@ -356,11 +356,11 @@ function declutter(){
   iconLbl.forEach(([t,,g])=>{const k=g._k||1;const im=g.querySelector('image');const ir=im&&R(im);const ph=ir?ir.height:40;
     const others=picsAll.filter(([h])=>h!==g&&h._name!==g._name).map(x=>x[1]),notOwn=picsAll.filter(([h])=>h!==g).map(x=>x[1]);
     // stay close under the picture; nudge down or sideways to clear paths and other labels
-    const cands=[[0,13],[0,23],[-22,13],[22,13],[-22,23],[22,23],[0,33],[-45,13],[45,13],[0,-ph-2]];let ok=null,first=null;
+    const cands=[[0,11]];let ok=null,first=null;
     for(const strict of [true,false]){for(const [dx,dy] of cands){t.setAttribute('x',dx/k);t.setAttribute('y',dy/k);const r=R(t);if(!r)break;if(!first)first=r;if(!hit(r,kept)&&!hit(r,dy<0?notOwn:others,-8)&&(!strict||!onPath(r))){ok=r;break}}if(ok)break}
     if(ok){kept.push(ok);return}
     // no clean spot: keep the default place if it at least avoids other labels (the white halo keeps it readable over a path)
-    t.setAttribute('x',0);t.setAttribute('y',13/k);if(first&&!hit(first,kept)){kept.push(first);return}vis(t,0)});
+    t.setAttribute('x',0);t.setAttribute('y',11/k);if(first&&!hit(first,kept)){kept.push(first);return}vis(t,0)});
   // 2) pins only where they don't cover an attraction name or another pin
   pins.forEach(m=>{const r=R(m);if(!r)return;if(hit(r,kept,1))vis(m,0);else kept.push(r)});
   // 3) area names last: off the pictures, off other labels and off the paths
@@ -368,6 +368,8 @@ function declutter(){
   lblEls.forEach(t=>{if(t.style.display==='none')return;const r=R(t);if(!r)return;if(hit(r,kept)||hit(r,pics,-6)||(t._L.s<15&&onPath(r)))vis(t,0);else kept.push(r)})}
 try{if(matchMedia('(min-width:700px)').matches)document.getElementById('legend').open=true}catch(e){}
 document.getElementById('legend').addEventListener('toggle',()=>declutterSoon());
+// label size follows zoom: smaller when the whole park is in view, larger when zoomed in close
+const LBL_FS=()=>Math.min(15,Math.max(8.5,11.5*Math.pow(0.25/view.s,0.3)));
 function apply(){
   view.s=Math.min(Math.max(view.s,0.05),12);
   const [w,h]=size();
@@ -377,6 +379,7 @@ function apply(){
   svg.classList.toggle('far',view.s>0.62);
   lblEls.forEach(t=>{const L=t._L;t.setAttribute('font-size',Math.max(L.s*Math.min(1,0.6/view.s+0.4),12*view.s));t.style.strokeWidth=3*view.s;t.style.display=((k>=L.minK*0.8||L.minK===0)&&(!L.maxK||k<L.maxK))?'':'none'});
   document.querySelectorAll('.um').forEach(m=>m.setAttribute('transform',`translate(${m._x} ${-m._y}) ${UP} scale(${view.s})`));
+  {const fs=LBL_FS();document.querySelectorAll('.um .mt').forEach(t=>t.setAttribute('font-size',fs+0.5))}
   gDraft.querySelectorAll('circle').forEach(c=>c.setAttribute('r',4*view.s));if(typeof zoneLabels==='function'&&ZL.length)zoneLabels();if(typeof iconScale==='function'&&IC.length)iconScale();declutterSoon();
   // scale bar
   const target=100*view.s, nice=[5,10,20,25,50,100,200,250,500,1000,2000].find(n=>n>=target*0.6)||2000;
@@ -488,7 +491,7 @@ ZEBRAS.forEach(z=>el('polyline',{class:'zebra',points:pts(z),fill:'none',stroke:
 function icResize(f){if(!icSel)return;icSel._p.W=Math.min(Math.max(icSel._p.W*f,4),400);iconScale();clearTimeout(icResize.t);icResize.t=setTimeout(()=>icStore(icSel),250)}
 function icInfo(){const el_=document.getElementById('ic-sel');if(!el_)return;el_.textContent=icSel?`Đang chọn: ${icSel._lg.querySelector('text').textContent} · rộng ${Math.round(icSel._p.W)} m · xoay ${Math.round(icSel._p.A||0)}°`:'Chưa chọn hình nào.'}
 // Positions/sizes confirmed by the park team (from the in-map 'Sửa hình' tool): file -> [x, y, width m]
-const ICON_BAKED={"farm-hill":[501.7,768.9,127.8,0],"lakeside":[849.5,974.4,54,0],"king-kong":[1196.7,894.7,63,0],"king-kong-2":[1183.7,889.5,180.1,0],"ca-heo":[1135.8,841,65.2,10],"strider":[886.3,825.3,50,0],"farm-hill-slide":[686.9,921.3,148.2,-3],"am-thuc":[965,918.8,69.7,0],"ngua":[919.9,859.5,22,0],"san-go":[1024.2,876.6,47,0],"wc-caheo":[1061,869,26,15],"playzone":[943.5,868.1,44,0]};
+const ICON_BAKED={"farm-hill":[501.7,768.9,127.8,0],"lakeside":[849.5,974.4,54,0],"king-kong":[1196.7,894.7,63,0],"king-kong-2":[1183.7,889.5,180.1,0],"ca-heo":[1135.8,841,65.2,10],"strider":[886.3,825.3,50,0],"farm-hill-slide":[686.9,921.3,148.2,-3],"am-thuc":[877.9,911.5,69.7,0],"ngua":[919.9,859.5,22,0],"san-go":[1024.2,876.6,47,0],"wc-caheo":[1061,869,26,15],"playzone":[943.5,868.1,44,0]};
 // icons trimmed along a road edge (world polygon x,y,...), so their outline follows the curve of the path
 const ICON_CLIP={};
 const ICON_KEY='tcp-guest-icons-none';let ICON_ED={};try{ICON_ED=JSON.parse(localStorage.getItem(ICON_KEY)||'{}')||{}}catch(e){}
@@ -521,7 +524,7 @@ function drawIcons(){gIcon.innerHTML='';gIconLbl.innerHTML='';IC=[];
 function iconScale(){IC.forEach(g=>{const p=g._p;g.classList.toggle('sel',g===icSel);if(p.fill){g._lg.setAttribute('transform',`translate(${p.x} ${-p.y}) ${UP} scale(${view.s})`);const t=g._lg.querySelector('text');t.style.fontSize='11.5px';t.style.strokeWidth='3px';return}const px=mode==='icon'?p.W/view.s:Math.max(p.W/view.s,p.minPx*Math.min(1,Math.max(.45,.3/view.s)));const k=px/100;
   const base=`translate(${p.x} ${-p.y}) ${UP} scale(${view.s}) translate(0 ${px*0.18})`;
   g.setAttribute('transform',`${base} rotate(${p.A||0} 0 ${-px*0.5}) scale(${p.F?-k:k} ${k})`);
-  g._lg.setAttribute('transform',`${base} scale(${k})`);const t=g._lg.querySelector('text');t.style.fontSize=(11.5/k)+'px';t.style.strokeWidth=(3/k)+'px';t.setAttribute('y',13/k);g._k=k})}
+  g._lg.setAttribute('transform',`${base} scale(${k})`);const t=g._lg.querySelector('text');const fs=LBL_FS();t.style.fontSize=(fs/k)+'px';t.style.strokeWidth=(3/k)+'px';t.setAttribute('y',11/k);g._k=k})}
 function zoneLabels(){ZL.forEach(t=>{const z=t._z;const fs=11;const fits=z.w/view.s>z.len*fs*0.62+6&&z.h/view.s>fs+4;
   t.style.display=fits&&!t._hasIcon?'':'none';t.setAttribute('font-size',fs);t.setAttribute('transform',`translate(${z.cx} ${-z.cy}) ${UP} scale(${view.s})`)})}
 
