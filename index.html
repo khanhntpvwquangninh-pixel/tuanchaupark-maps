@@ -695,7 +695,9 @@ let rMode='walk';const DRIVE_SPEED=250;// m/phút, xe chạy chậm trong khu (~
 const okDrive=st=>st===10||st===7;
 const fmtM=m=>m>=1000?(Math.round(m/100)/10).toString().replace('.',',')+' km':Math.max(10,Math.round(m/10)*10)+' m';
 const mins=(m,sp)=>Math.max(1,Math.round(m/sp));
-function walkLeg(P,Q,noStair,pen){const ea=nearestEdge(...P,noStair),eb=nearestEdge(...Q,noStair,null,true);if(!ea||!eb)return null;const r=routeBetween(ea,eb,noStair,pen);if(!r)return null;
+function walkLeg(P,Q,noStair,pen){let ea=nearestEdge(...P,noStair),eb=nearestEdge(...Q,noStair,null,true);if(!ea||!eb)return null;let r=routeBetween(ea,eb,noStair,pen);
+  if(!r){const rd=st=>st===7||st===10;const eb2=nearestEdge(...Q,noStair,rd,true),ea2=nearestEdge(...P,noStair);r=eb2&&routeBetween(ea2,eb2,noStair,pen);if(r){eb=eb2}else{const ea3=nearestEdge(...P,noStair,rd);r=ea3&&routeBetween(ea3,eb,noStair,pen);if(r)ea=ea3}}
+  if(!r)return null;
   const keys=[];for(let i=1;i<r.nodes.length;i++)keys.push(edgeKey(r.nodes[i-1],r.nodes[i]));return {len:r.len,line:[ea.q,...r.nodes.map(i=>G.xy[i]),eb.q],first:ea,last:eb,keys}}
 function walkTrip(stops,noStair,pen){let len=0,line=[],keys=[],first=null,last=null;for(let k=1;k<stops.length;k++){const r=walkLeg(stops[k-1],stops[k],noStair,pen);if(!r)return null;if(k===1)first=r.first;last=r.last;len+=r.len;line=line.concat(r.line);keys=keys.concat(r.keys)}
   const off=Math.hypot(stops[0][0]-first.q[0],stops[0][1]-first.q[1])+Math.hypot(stops[stops.length-1][0]-last.q[0],stops[stops.length-1][1]-last.q[1]);return {len:len+off,line,keys,first,last}}
@@ -720,7 +722,9 @@ function drawRoute(keepView){gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteG
   // both modes are planned so each chip can show its time, like a phone map
   const best=walkTrip(stops,noStair,null);const drive=driveTrip([ax,ay],[bx,by]);
   const walkMin=best?mins(best.len,WALK_SPEED):null;
-  const driveOk=drive&&drive.len>150;const driveMin=driveOk?mins(drive.len,DRIVE_SPEED)+mins(drive.walk,WALK_SPEED)*(drive.walk>20?1:0):null;
+  let driveOk=drive&&drive.len>150;const driveMin=driveOk?mins(drive.len,DRIVE_SPEED)+mins(drive.walk,WALK_SPEED)*(drive.walk>20?1:0):null;
+  // like a phone map: offer the car only where it helps (clearly faster, and not mostly walking anyway)
+  if(driveOk&&best&&(driveMin>=walkMin-2||drive.walk>Math.max(150,best.len*0.4)))driveOk=false;
   if(rMode==='drive'&&!driveOk)rMode='walk';
   $('r-modes').hidden=false;$('m-walk').setAttribute('aria-pressed',rMode==='walk');$('m-drive').setAttribute('aria-pressed',rMode==='drive');
   $('m-walk-t').textContent=walkMin?walkMin+' phút':'—';$('m-drive-t').textContent=driveOk?driveMin+' phút':'không cần';$('m-drive').disabled=!driveOk;
@@ -762,6 +766,8 @@ function drawRoute(keepView){gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteG
     passed.sort((a,b)=>a[0]-b[0]);
     html=`<div class="eta"><b>${mins(main.len,WALK_SPEED)} phút</b> <span>(${fmtM(main.len)})</span>${routeAlt?' <small>· đường khác</small>':' <small>· nhanh nhất</small>'}</div>`;
     if(usesStair)html+='<small>Có đoạn cầu thang</small>';
+    {let rd=0;for(let k=1;k<line.length;k++){const u=G.xy.findIndex(p=>p===line[k-1]),v=G.xy.findIndex(p=>p===line[k]);if(u>=0&&v>=0&&G.adj[u].some(([w,,st])=>w===v&&(st===7||st===10)))rd+=Math.hypot(line[k][0]-line[k-1][0],line[k][1]-line[k-1][1])}
+     if(rd>60)html+=`<small>⚠ Có ${fmtM(rd)} đi bộ dọc mép đường xe, chú ý ô tô, xe máy.</small>`}
     if(passed.length)html+=`<div class="via">Đi qua: ${passed.map(x=>esc(x[1])).join(' → ')}</div>`;
     if(other)html+=`<button class="btn" id="r-swap">${routeAlt?'↩ Về đường nhanh nhất':'Đường khác'} · ${mins(other.len,WALK_SPEED)} phút (${fmtM(other.len)})</button>`;
   }
