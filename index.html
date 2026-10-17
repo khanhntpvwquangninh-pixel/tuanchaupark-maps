@@ -340,7 +340,9 @@ let _dcl=0;function declutterSoon(){cancelAnimationFrame(_dcl);_dcl=requestAnima
 let _pathPts=null;function pathPts(){if(_pathPts)return _pathPts;const out=[];const add=a=>{for(let i=0;i+3<a.length;i+=2){const x0=a[i],y0=a[i+1],x1=a[i+2],y1=a[i+3],n=Math.max(1,Math.ceil(Math.hypot(x1-x0,y1-y0)/2.5));for(let j=0;j<=n;j++)out.push(x0+(x1-x0)*j/n,-(y0+(y1-y0)*j/n))}};
   WALK.forEach(([st,a])=>{if(st!==6)add(a)});BASE.lines.forEach(l=>add(l[2]));return _pathPts=new Float32Array(out)}
 // names placed above the picture (e.g. the wooden playground, so its name sits by Playzone and not by the restroom building below it)
-const LABEL_ABOVE=['san-go'];
+const LABEL_ABOVE=[];
+// names placed beside the picture, at mid height (the wooden playground: left of the strip so it isn't read as the restroom building or Playzone)
+const LABEL_LEFT=['san-go'];
 const ICON_AR={};
 function declutter(){
   const vis=(e,v)=>{e.style.visibility=v?'':'hidden'};
@@ -363,8 +365,9 @@ function declutter(){
     const others=picsAll.filter(([h])=>h!==g&&h._name!==g._name).map(x=>x[1]),notOwn=picsAll.filter(([h])=>h!==g).map(x=>x[1]);
     // stay close under the picture; nudge down or sideways to clear paths and other labels
     const ar=Math.min(1,ICON_AR[g._f]||1),up=-(100*ar*k)-4;// screen px from the picture's base to just above its top
-    const cands=LABEL_ABOVE.includes(g._f)?[[0,up],[0,11]]:[[0,11],[0,up]];let ok=null,first=null;
-    for(const strict of [true,false]){for(const [dx,dy] of cands){t.setAttribute('x',dx/k);t.setAttribute('y',dy/k);const r=R(t);if(!r)break;if(!first)first=r;const pinned=LABEL_ABOVE.includes(g._f)&&dy<0;if(!hit(r,kept)&&(pinned||!hit(r,dy<0?notOwn:others,-8))&&(pinned||!strict||!onPath(r))){ok=r;break}}if(ok)break}
+    let cands=LABEL_ABOVE.includes(g._f)?[[0,up],[0,11]]:[[0,11],[0,up]];
+    if(LABEL_LEFT.includes(g._f)){const arr=ICON_AR[g._f]||1,pw=100*k*Math.min(1,1/arr),phh=100*k*Math.min(1,arr);t.setAttribute('x',0);const tw=(t.getBoundingClientRect().width||60);cands=[[-(pw*0.35)-tw/2,-phh*0.5],[0,11]]}let ok=null,first=null;
+    for(const strict of [true,false]){for(const [dx,dy] of cands){t.setAttribute('x',dx/k);t.setAttribute('y',dy/k);const r=R(t);if(!r)break;if(!first)first=r;const pinned=(LABEL_ABOVE.includes(g._f)&&dy<0)||(LABEL_LEFT.includes(g._f)&&dx<0);if(!hit(r,kept)&&(pinned||!hit(r,dy<0?notOwn:others,-8))&&(pinned||!strict||!onPath(r))){ok=r;break}}if(ok)break}
     if(ok){kept.push(ok);return}
     // no clean spot: keep the default place if it at least avoids other labels (the white halo keeps it readable over a path)
     t.setAttribute('x',0);t.setAttribute('y',11/k);if(first&&!hit(first,kept)){kept.push(first);return}vis(t,0)});
@@ -499,7 +502,10 @@ const gWalkGhost=el('g',{'pointer-events':'none',mask:'url(#ghostmask)'});world.
 const GHOST_HIDE=['farm-hill-slide','king-kong','king-kong-2'];
 (function(){const d=svg.querySelector('defs')||svg.insertBefore(document.createElementNS(SVGNS,'defs'),svg.firstChild);
   d.insertAdjacentHTML('beforeend','<filter id="blk" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/></filter><mask id="ghostmask" maskUnits="userSpaceOnUse" x="-100000" y="-100000" width="200000" height="200000"><rect x="-100000" y="-100000" width="200000" height="200000" fill="#fff"/>'+GHOST_HIDE.map(f=>'<use href="#ic-'+f+'" filter="url(#blk)"/>').join('')+'</mask>')})();
-WALK.forEach(([st,a])=>{if(st===4||st>=6)return;el('polyline',{class:'wghost',points:pts(a),fill:'none',stroke:st===1?css('--stair'):st===3?'#f5cf3a':css('--path'),'stroke-width':2.2,'stroke-dasharray':'1.5 4.5','stroke-linecap':'round','stroke-linejoin':'round','stroke-opacity':.95,'vector-effect':'non-scaling-stroke'},gWalkGhost)});
+// no dotted trace over the King Kong valley and Farm Hill (their pictures already show their own paths); done here rather than only with an SVG mask, which some phone browsers ignore
+const noGhostZones=ZONES.filter(z=>z[0]==='King Kong Park'||z[0]==='Tuần Châu Farm Hill').map(z=>z[2]);
+const inZ=(x,y)=>noGhostZones.some(r=>inRing(x,y,r));
+WALK.forEach(([st,a])=>{if(st===4||st>=6)return;let n=0;for(let i=0;i<a.length;i+=2)if(inZ(a[i],a[i+1]))n++;if(n>a.length/4)return;el('polyline',{class:'wghost',points:pts(a),fill:'none',stroke:st===1?css('--stair'):st===3?'#f5cf3a':css('--path'),'stroke-width':2.2,'stroke-dasharray':'1.5 4.5','stroke-linecap':'round','stroke-linejoin':'round','stroke-opacity':.95,'vector-effect':'non-scaling-stroke'},gWalkGhost)});
 // staff-only paths (dashed) stay readable where an attraction picture sits on them
 
 // zebra crossings on top of every road and path layer
