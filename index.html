@@ -335,6 +335,7 @@ const LABELS=[
   {x:720,y:740,t:'Khán đài ven hồ',s:9,w:500,minK:1.2},
   {x:1166,y:842,t:'Lối nội bộ – khách không đi',s:4,w:600,minK:2.4,rot:-80,c:'--muted'},
   {x:1040,y:795,t:'Lối ra',s:5,w:600,minK:2.4,rot:-80,c:'--muted'},
+  {x:612,y:664,t:'Đường ô tô, xe máy vào Tuần Châu Farm',s:5.5,w:600,minK:1.3,rot:0,c:'--ink',road:1},
   {x:1088,y:868,t:'Đường cầu vồng',s:5,w:600,minK:2.4,rot:-55,c:'--route'},
   {x:1097,y:292,t:'Cảng tàu Tuần Châu',s:10,w:600,minK:.8},
   {x:1250,y:1080,t:'Đường Ngọc Châu',s:9,w:500,minK:1,rot:-52},
@@ -392,7 +393,7 @@ function declutter(){
   pins.forEach(m=>{if(m._wc)return;const r=R(m);if(!r)return;if(hit(r,kept,1))vis(m,0);else kept.push(r)});
   // 3) area names last: off the pictures, off other labels and off the paths
   const pics=[];if(typeof IC!=='undefined')IC.forEach(g=>{const im=g.querySelector('image');const r=im&&R(im);if(r)pics.push(r)});
-  lblEls.forEach(t=>{if(t.style.display==='none')return;const r=R(t);if(!r)return;if(hit(r,kept)||hit(r,pics,-6)||(t._L.s<15&&onPath(r)))vis(t,0);else kept.push(r)})}
+  lblEls.forEach(t=>{if(t.style.display==='none')return;const r=R(t);if(!r)return;if(hit(r,kept)||hit(r,pics,-6)||(t._L.s<15&&!t._L.road&&onPath(r)))vis(t,0);else kept.push(r)})}
 try{if(matchMedia('(min-width:700px)').matches)document.getElementById('legend').open=true}catch(e){}
 document.getElementById('legend').addEventListener('toggle',()=>declutterSoon());
 // label size follows zoom: smaller when the whole park is in view, larger when zoomed in close
@@ -735,13 +736,15 @@ function drawRoute(keepView){gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteG
   let html='',frame=[ax,ay,bx,by];
   if(rMode==='drive'){
     // drive the vehicle road, then walk the last bit (dotted, the way a phone map shows the walk to the door)
+    const fr=WALK.filter(w=>w[0]===7).flatMap(w=>{const o=[];for(let i=0;i<w[1].length;i+=2)o.push([w[1][i],w[1][i+1]]);return o});
+    const farmRd=drive.line.some(p=>fr.some(q=>Math.hypot(p[0]-q[0],p[1]-q[1])<2));
     line_(drive.line.flat(),'#1967d2',7);frame=frame.concat(drive.line.flat());
     if(drive.w1){dotLeg(drive.w1.line.flat());frame=frame.concat(drive.w1.line.flat())}
     if(drive.w2){dotLeg(drive.w2.line.flat());frame=frame.concat(drive.w2.line.flat())}
     if(A.me&&!drive.w1)dotLeg([ax,ay,drive.first.q[0],drive.first.q[1]]);
     if(!A.me)pin(...(drive.w1?drive.w1.first.q:drive.first.q),'#1a73e8','#1a73e8');pin(...(drive.w2?drive.w2.last.q:drive.last.q),'#d93025','#d93025');
     html=`<div class="eta"><b>${driveMin} phút</b> <span>(${fmtM(drive.len+drive.walk)})</span></div>`+
-      `<div class="legs"><span>🛵 Đi xe ${fmtM(drive.len)} theo đường nhựa (đường Ngọc Châu, đường vào Farm)</span>`+(drive.walk>20?`<span>🚶 Gửi xe gần điểm đến, đi bộ thêm ${fmtM(drive.walk)} · ${mins(drive.walk,WALK_SPEED)} phút</span>`:'')+`</div>`+
+      `<div class="legs"><span>🛵 Đi xe ${fmtM(drive.len)}: ${farmRd?'theo đường Ngọc Châu, rẽ vào đường vòng phía tây lên Tuần Châu Farm':'theo đường Ngọc Châu'}</span>`+(drive.walk>20?`<span>🚶 Gửi xe gần điểm đến, đi bộ thêm ${fmtM(drive.walk)} · ${mins(drive.walk,WALK_SPEED)} phút</span>`:'')+`</div>`+
       `<small>Xe chạy chậm, nhường đường cho khách đi bộ. Không đi xe vào lối đi bộ.</small>`;
   }else{
     let alt=walkTrip(stops,noStair,new Set(best.keys));
