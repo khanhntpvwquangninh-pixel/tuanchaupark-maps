@@ -701,13 +701,40 @@ function walkLeg(P,Q,noStair,pen){let ea=nearestEdge(...P,noStair),eb=nearestEdg
   const keys=[];for(let i=1;i<r.nodes.length;i++)keys.push(edgeKey(r.nodes[i-1],r.nodes[i]));return {len:r.len,line:[ea.q,...r.nodes.map(i=>G.xy[i]),eb.q],first:ea,last:eb,keys}}
 function walkTrip(stops,noStair,pen){let len=0,line=[],keys=[],first=null,last=null;for(let k=1;k<stops.length;k++){const r=walkLeg(stops[k-1],stops[k],noStair,pen);if(!r)return null;if(k===1)first=r.first;last=r.last;len+=r.len;line=line.concat(r.line);keys=keys.concat(r.keys)}
   const off=Math.hypot(stops[0][0]-first.q[0],stops[0][1]-first.q[1])+Math.hypot(stops[stops.length-1][0]-last.q[0],stops[stops.length-1][1]-last.q[1]);return {len:len+off,line,keys,first,last}}
-function driveTrip(P,Q){const ea=nearestEdge(...P,false,okDrive),eb=nearestEdge(...Q,false,okDrive);if(!ea||!eb)return null;const r=routeBetween(ea,eb,false,null,okDrive);if(!r)return null;
-  const line=[ea.q,...r.nodes.map(i=>G.xy[i]),eb.q];
-  // walk from the start to the road and from the road to the place
-  // short hops (< 60 m) are walked straight; longer ones follow the walkways, and never come out longer than 3x the straight distance
-  const hop=(p,q)=>{const d=Math.hypot(p[0]-q[0],p[1]-q[1]);if(d<=15)return null;const st={len:d,line:[p,q],first:{q:p},last:{q:q}};if(d<60)return st;const w=walkLeg(p,q,false);return w&&w.len<d*3?w:st};
-  const w1=hop(P,ea.q),w2=hop(eb.q,Q);
-  const wl=(w1?w1.len:0)+(w2?w2.len:0);return {len:r.len,line,w1,w2,walk:wl,first:ea,last:eb}}
+// Driving: get on and off the road only where a walkway actually meets it (or right beside the place),
+// so the walk to the door never cuts across a lake or a lawn. The drop-off is chosen to minimise drive + walk time.
+const nonRoad=st=>st!==7&&st!==10;
+let RADJ=null;function radj(){if(RADJ)return RADJ;RADJ=G.adj.map(()=>[]);G.adj.forEach((es,u)=>es.forEach(([v,w,st])=>RADJ[v].push([u,w,st])));return RADJ}
+let ACC=null;function access(){if(ACC)return ACC;ACC=[];G.adj.forEach((es,u)=>{if(es.some(e=>okDrive(e[2]))&&es.some(e=>nonRoad(e[2])&&e[2]!==3))ACC.push(u)});return ACC}
+function distFrom(e,ok,rev){const n=G.xy.length,D=new Float64Array(n).fill(Infinity),done=new Uint8Array(n),A=rev?radj():G.adj;
+  if(rev){D[e.u]=e.t*e.len;if(e.two)D[e.v]=(1-e.t)*e.len}else{D[e.v]=(1-e.t)*e.len;if(e.two)D[e.u]=e.t*e.len}
+  for(;;){let u=-1,bd=Infinity;for(let i=0;i<n;i++)if(!done[i]&&D[i]<bd){bd=D[i];u=i}if(u<0)break;done[u]=1;
+    for(const [v,w,st] of A[u]){if(ok&&!ok(st))continue;const nd=bd+w;if(nd<D[v])D[v]=nd}}return D}
+const atNode=c=>({u:c,v:c,t:0,q:G.xy[c],len:0,two:true,d:0});
+function legLine(a,b,ok){const r=routeBetween(a,b,false,null,ok);if(!r)return null;return {len:r.len,line:[a.q,...r.nodes.map(i=>G.xy[i]),b.q],first:a,last:b}}
+function driveTrip(P,Q){
+  const rP=nearestEdge(...P,false,okDrive),rQ=nearestEdge(...Q,false,okDrive);if(!rP||!rQ)return null;
+  const wP=nearestEdge(...P,false,nonRoad,true),wQ=nearestEdge(...Q,false,nonRoad,true);
+  const acc=access();
+  // boarding: straight onto the road if the place sits right by it, else walk the paths to the nearest access point
+  let board=null,w1=null;
+  if(!wP||rP.d<=25||rP.d<wP.d){board=rP;if(rP.d>15)w1={len:rP.d,line:[P,rP.q],first:{q:P},last:{q:rP.q}}}
+  else{const Dw=distFrom(wP,nonRoad,false);let bc=-1,bv=Infinity;for(const c of acc)if(Dw[c]<bv){bv=Dw[c];bc=c}
+    if(bc<0)return null;board=atNode(bc);w1=legLine(wP,board,nonRoad);if(w1){w1.len+=wP.d;w1.line.unshift(P);w1.first={q:P}}}
+  const Dd=distFrom(board,okDrive,false);
+  // drop-off: compare every access point (drive + walk on paths) with stopping on the road right beside the place
+  let best=null;
+  if(!wQ||rQ.d<=25||rQ.d<wQ.d){const dd=Dd[rQ.u]+rQ.t*rQ.len,dv=rQ.two?Dd[rQ.v]+(1-rQ.t)*rQ.len:Infinity,d=Math.min(dd,dv);
+    if(isFinite(d))best={c:null,cost:d/DRIVE_SPEED+rQ.d/WALK_SPEED}}
+  if(wQ){const Dw=distFrom(wQ,nonRoad,true);for(const c of acc){if(!isFinite(Dd[c])||!isFinite(Dw[c]))continue;const cost=Dd[c]/DRIVE_SPEED+(Dw[c]+wQ.d)/WALK_SPEED;if(!best||cost<best.cost)best={c,cost}}}
+  if(!best)return null;
+  let alight,w2=null;
+  if(best.c===null){alight=rQ;if(rQ.d>15)w2={len:rQ.d,line:[rQ.q,Q],first:{q:rQ.q},last:{q:Q}}}
+  else{alight=atNode(best.c);w2=legLine(alight,wQ,nonRoad);if(w2){w2.len+=wQ.d;w2.line.push(Q);w2.last={q:Q}}}
+  const r=routeBetween(board,alight,false,null,okDrive);if(!r)return null;
+  const line=[board.q,...r.nodes.map(i=>G.xy[i]),alight.q];
+  if(w1&&w1.len<=15)w1=null;if(w2&&w2.len<=15)w2=null;
+  const wl=(w1?w1.len:0)+(w2?w2.len:0);return {len:r.len,line,w1,w2,walk:wl,first:board,last:alight}}
 function drawRoute(keepView){gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteGhost.innerHTML='';gWalkGhost.style.display='';const sum=$('r-sum');$('r-modes').hidden=true;
   let A=state.points[rFrom];const B=state.points[rTo];
   if(rFrom===-2){if(!B){sum.textContent='Chọn điểm đến để xem đường đi.';return}
@@ -749,7 +776,7 @@ function drawRoute(keepView){gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteG
     if(A.me&&!drive.w1)dotLeg([ax,ay,drive.first.q[0],drive.first.q[1]]);
     if(!A.me)pin(...(drive.w1?drive.w1.first.q:drive.first.q),'#1a73e8','#1a73e8');pin(...(drive.w2?drive.w2.last.q:drive.last.q),'#d93025','#d93025');
     html=`<div class="eta"><b>${driveMin} phút</b> <span>(${fmtM(drive.len+drive.walk)})</span></div>`+
-      `<div class="legs"><span>🛵 Đi xe ${fmtM(drive.len)}: ${lakeRd?(drive.line.some(p=>p[0]>1060)?'theo đường Ngọc Châu, rẽ vào đường vòng phía tây, đi tiếp ':'theo ')+'đường ven hồ tới lối sau Lakeside Coffee':farmRd?'theo đường Ngọc Châu, rẽ vào đường vòng phía tây lên Tuần Châu Farm':'theo đường Ngọc Châu'}</span>`+(drive.walk>20?`<span>🚶 Gửi xe gần điểm đến, đi bộ thêm ${fmtM(drive.walk)} · ${mins(drive.walk,WALK_SPEED)} phút</span>`:'')+`</div>`+
+      `<div class="legs"><span>🛵 Đi xe ${fmtM(drive.len)}: ${lakeRd?(Math.hypot(drive.line[0][0]-862,drive.line[0][1]-1003)<40?'từ lối sau Lakeside Coffee theo đường ven hồ'+(drive.line.some(p=>p[0]>1060)?' ra đường vòng phía tây, tới đường Ngọc Châu':' ra đường vòng phía tây'):(drive.line.some(p=>p[0]>1060)?'theo đường Ngọc Châu, rẽ vào đường vòng phía tây, đi tiếp ':'theo ')+'đường ven hồ tới lối sau Lakeside Coffee'):farmRd?(drive.line[0][0]<1000?'theo đường vòng phía tây ra đường Ngọc Châu':'theo đường Ngọc Châu, rẽ vào đường vòng phía tây lên Tuần Châu Farm'):'theo đường Ngọc Châu'}</span>`+(drive.walk>20?`<span>🚶 Gửi xe gần điểm đến, đi bộ thêm ${fmtM(drive.walk)} · ${mins(drive.walk,WALK_SPEED)} phút</span>`:'')+`</div>`+
       `<small>Xe chạy chậm, nhường đường cho khách đi bộ. Không đi xe vào lối đi bộ.</small>`;
   }else{
     let alt=walkTrip(stops,noStair,new Set(best.keys));
