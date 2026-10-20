@@ -923,9 +923,9 @@ function drawRoute(keepView){$('navb').hidden=true;gRoute.innerHTML='';gRoutePin
     if(!alt)routeAlt=0;
     const main=routeAlt&&alt?alt:best,other=routeAlt&&alt?best:alt;
     if(other){const of=other.line.flat();el('polyline',{points:pts(of),fill:'none',stroke:'#ffffff','stroke-width':9,'stroke-linecap':'round','stroke-linejoin':'round','vector-effect':'non-scaling-stroke'},gRoute);
-      el('polyline',{class:'ralt',points:pts(of),fill:'none',stroke:'#8ab4f8','stroke-width':5,'stroke-linecap':'round','stroke-linejoin':'round','vector-effect':'non-scaling-stroke',style:'cursor:pointer'},gRoute);
-      el('polyline',{points:pts(of),fill:'none',stroke:'#8ab4f8','stroke-width':3,'stroke-dasharray':'0.1 6','stroke-linecap':'round','vector-effect':'non-scaling-stroke'},gRouteGhost)}
-    const flat=main.line.flat();line_(flat,css('--route'),6.5);frame=frame.concat(flat);
+      el('polyline',{class:'ralt',points:pts(of),fill:'none',stroke:'#8a9199','stroke-width':6,'stroke-linecap':'round','stroke-linejoin':'round','vector-effect':'non-scaling-stroke',style:'cursor:pointer'},gRoute);
+      el('polyline',{points:pts(of),fill:'none',stroke:'#9aa0a6','stroke-width':3,'stroke-dasharray':'0.1 6','stroke-linecap':'round','vector-effect':'non-scaling-stroke'},gRouteGhost)}
+    const flat=main.line.flat();line_(flat,css('--route'),7.5);frame=frame.concat(flat);
     if(A.me)dotLeg([ax,ay,main.first.q[0],main.first.q[1]]);
     if(!A.me)pin(...main.first.q,'#1a73e8','#1a73e8');pin(...main.last.q,'#d93025','#d93025');
     const line=main.line;let usesStair=false;for(let k=1;k<line.length;k++){const u=G.xy.findIndex(p=>p===line[k-1]),v=G.xy.findIndex(p=>p===line[k]);if(u>=0&&v>=0&&G.adj[u].some(([w,,st])=>w===v&&st===1)){usesStair=true;break}}
