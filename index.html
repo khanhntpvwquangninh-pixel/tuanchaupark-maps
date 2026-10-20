@@ -871,11 +871,21 @@ function drawRoute(keepView){$('navb').hidden=true;gRoute.innerHTML='';gRoutePin
   if(A.me&&Math.hypot(ax-bx,ay-by)<20){sum.innerHTML='<b>Bạn đã đến nơi.</b>';if(meFollow){const nb=$('navb');nb.hidden=false;nb.innerHTML='<span class="ic">📍</span><div><div class="d">Đã đến</div><div class="t">'+B.name+'</div></div>'}return}
   const stops=[[ax,ay]];(B.via||[]).forEach(n=>{if(Array.isArray(n)){stops.push(n);return}const p=state.points.find(q=>q.name===n);if(p&&p!==A)stops.push(fromLL(p.lat,p.lon))});stops.push([bx,by]);
   // both modes are planned so each chip can show its time, like a phone map
-  const best=walkTrip(stops,noStair,null);const drive=driveTrip([ax,ay],[bx,by]);
-  const walkMin=best?mins(best.len,WALK_SPEED):null;
+  const best=walkTrip(stops,noStair,null);
+  // Lakeside-only guests go by the big road: both their walk and their ride end at the café's back gate
+  // the big-road choice is for guests starting outside the ticketed park (gate area, car park, King Kong, the Farm); inside, everyone walks the paths
+  const OUTSIDE=/^(Quầy vé|Lâu đài|Bãi đỗ xe|Soát vé|Lối ra|King Kong|Cổng soát vé King Kong|Tuần Châu Farm$)/;
+  const startPt=A.me?(()=>{let bi=null,bd=Infinity;state.points.forEach(q=>{if(q.type==='wc')return;const [x,y]=fromLL(q.lat,q.lon);const d=Math.hypot(x-ax,y-ay);if(d<bd){bd=d;bi=q}});return bi})():A;
+  let lk=isLakeDest(B)&&startPt&&OUTSIDE.test(startPt.name)?driveTrip([ax,ay],[bx,by],LAKE_GATE):null;if(lk&&lk.len<150)lk=null;
+  const lkOn=!!(lk&&lakeRoad);
+  const drive=lkOn?lk:driveTrip([ax,ay],[bx,by]);
+  // how much of the walk runs along the car road: a walk that is mostly road is exactly where a ride helps
+  let roadM=0;if(best){const L=best.line;for(let k=1;k<L.length;k++){const u=nodeOf(L[k-1]),v=nodeOf(L[k]);if(u!=null&&v!=null&&G.adj[u].some(([w,,st])=>w===v&&(st===7||st===10)))roadM+=Math.hypot(L[k][0]-L[k-1][0],L[k][1]-L[k-1][1])}}
+  const walkLen=lkOn?lk.len+lk.walk:best?best.len:null;const mostlyRoad=lkOn||(best&&roadM>best.len*0.4);
+  const walkMin=walkLen!=null?mins(walkLen,WALK_SPEED):null;
   let driveOk=drive&&drive.len>150;const driveMin=driveOk?mins(drive.len,DRIVE_SPEED)+mins(drive.walk,WALK_SPEED)*(drive.walk>20?1:0):null;
   // like a phone map: offer the car only where it helps (clearly faster, and not mostly walking anyway)
-  if(driveOk&&best&&(driveMin>walkMin||drive.walk>Math.max(150,best.len*0.4)))driveOk=false;
+  if(driveOk&&walkMin!=null&&(driveMin>walkMin||(!mostlyRoad&&drive.walk>Math.max(150,walkLen*0.4))))driveOk=false;
   if(rMode==='drive'&&!driveOk)rMode='walk';
   $('r-modes').hidden=false;$('m-walk').setAttribute('aria-pressed',rMode==='walk');$('m-drive').setAttribute('aria-pressed',rMode==='drive');
   $('m-walk-t').textContent=walkMin?walkMin+' phút':'—';$('m-drive-t').textContent=driveOk?driveMin+' phút':'không cần';$('m-drive').disabled=!driveOk;
@@ -903,7 +913,6 @@ function drawRoute(keepView){$('navb').hidden=true;gRoute.innerHTML='';gRoutePin
       `<div class="legs"><span>🛵 Đi xe ${fmtM(drive.len)}: ${lakeRd?(Math.hypot(drive.line[0][0]-862,drive.line[0][1]-1003)<40?'từ lối sau Lakeside Coffee theo đường ven hồ'+(drive.line.some(p=>p[0]>1060)?' ra đường vòng phía tây, tới đường Ngọc Châu':' ra đường vòng phía tây'):(drive.line.some(p=>p[0]>1060)?'theo đường Ngọc Châu, rẽ vào đường vòng phía tây, đi tiếp ':'theo ')+'đường ven hồ tới lối sau Lakeside Coffee'):farmRd?(drive.line[0][0]<1000?'theo đường vòng phía tây ra đường Ngọc Châu':'theo đường Ngọc Châu, rẽ vào đường vòng phía tây lên Tuần Châu Farm'):'theo đường Ngọc Châu'}</span>`+(drive.walk>20?`<span>🚶 Gửi xe gần điểm đến, đi bộ thêm ${fmtM(drive.walk)} · ${mins(drive.walk,WALK_SPEED)} phút</span>`:'')+`</div>`+
       `<small>Xe chạy chậm, nhường đường cho khách đi bộ. Không đi xe vào lối đi bộ.</small>`;
   }else{
-    const lk=isLakeDest(B)?driveTrip([ax,ay],[bx,by],LAKE_GATE):null;
     const lkHtml=lk?`<div class="lkc" role="group" aria-label="Loại vé"><button id="lk-combo" aria-pressed="${!lakeRoad}">🎟 Có vé combo<br><small>đi trong khu</small></button><button id="lk-road" aria-pressed="${lakeRoad}">☕ Chỉ đến Lakeside<br><small>đi theo đường lớn</small></button></div>`:'';
     if(lk&&lakeRoad){
       const L=[...(lk.w1?lk.w1.line:[]),...lk.line,...(lk.w2?lk.w2.line:[])];const fr=lk.w1?lk.w1.line.length:0;
