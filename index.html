@@ -34,6 +34,16 @@ body.big .sheet{font-size:17px}body.big .rsum .eta b{font-size:26px}body.big .st
 .app[data-s=open] .sheet{max-height:62%}
 .gx-info p{white-space:nowrap;text-overflow:ellipsis;max-height:none}
 .gx-info .ty{display:inline-block;margin-left:8px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:10px;color:#fff;vertical-align:3px}
+.gx-h{display:none!important}
+.gx-top{position:absolute;left:10px;right:10px;top:10px;z-index:7;background:var(--panel);border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.18);padding:8px 52px 8px 10px}
+.gx-top[hidden]{display:none}
+.gx-top .rbox{gap:6px}.gx-top .rfields{gap:5px}.gx-top .sel select{height:38px!important;font-size:15px!important}.gx-top .rflip{width:36px;height:36px}
+.gx-tx{position:absolute;right:8px;top:8px;width:36px!important;height:36px!important}
+.app.gx-routing .zoom{top:112px}.app.gx-routing .legend{top:112px!important}
+.gx-msg{font-size:15px;color:var(--muted)}
+.gx-modes button{font-size:15px}
+.gx-sub .btn{min-height:44px;font-size:15px;border-radius:22px;padding:0 14px}
+.gx-ns[aria-pressed=true]{background:#e8f0fe;border-color:#1a73e8;color:#174ea6}
 /* welcome screen */
 .gx-w{position:fixed;inset:0;z-index:50;background:#fff;overflow:auto;display:flex;flex-direction:column;align-items:center;padding:22px 20px calc(20px + env(safe-area-inset-bottom,0px));box-sizing:border-box;color:#16324a;font-family:var(--f-ui)}
 .gx-w[hidden]{display:none}
@@ -508,8 +518,8 @@ function showMe(lat,lon,acc){meFix=[lat,lon];const [x,y]=fromLL(lat,lon);
   if(meFollow){const s=w2s(x,-y);view.cx=s[0];view.cy=s[1];apply()}
   if(rFrom===-2&&rTo>=0&&(!meLastRoute||Math.hypot(x-meLastRoute[0],y-meLastRoute[1])>8)){meLastRoute=[x,y];drawRoute(true)}}
 function startLocate(center){meCenter=center;if(meWatch!==null)return;if(!navigator.geolocation){toast('Thiết bị không hỗ trợ định vị');$('r-sum').textContent='Thiết bị không hỗ trợ định vị. Hãy chọn điểm xuất phát trong danh sách.';return}
-  toast('Đang tìm vị trí của bạn…');
-  try{meWatch=navigator.geolocation.watchPosition(p=>showMe(p.coords.latitude,p.coords.longitude,p.coords.accuracy),e=>{meWatch&&navigator.geolocation.clearWatch(meWatch);meWatch=null;const m=e.code===1?'Bạn chưa cho phép định vị. Bật quyền vị trí cho trình duyệt rồi thử lại.':'Chưa lấy được vị trí, thử lại sau ít phút.';toast(m);if(rFrom===-2)$('r-sum').textContent=m},{enableHighAccuracy:true,maximumAge:5000,timeout:20000})}catch(e){toast('Không dùng được định vị ở trang này')}}
+  window.meQuiet||toast('Đang tìm vị trí của bạn…');
+  try{meWatch=navigator.geolocation.watchPosition(p=>showMe(p.coords.latitude,p.coords.longitude,p.coords.accuracy),e=>{meWatch&&navigator.geolocation.clearWatch(meWatch);meWatch=null;const m=e.code===1?'Bạn chưa cho phép định vị. Bật quyền vị trí cho trình duyệt rồi thử lại.':'Chưa lấy được vị trí, thử lại sau ít phút.';if(!window.meQuiet)toast(m);if(rFrom===-2)$('r-sum').textContent=m},{enableHighAccuracy:true,maximumAge:5000,timeout:20000})}catch(e){toast('Không dùng được định vị ở trang này')}}
 $('zloc').onclick=()=>{if(meG&&meFix){const s=w2s(meG._x,-meG._y);view.cx=s[0];view.cy=s[1];apply();return}startLocate(true)};
 addEventListener('resize',apply);
 
@@ -614,7 +624,7 @@ function drawIcons(){gIcon.innerHTML='';gIconLbl.innerHTML='';IC=[];
     let host=gIcon,wrap=null;if(ICON_CLIP[f]){const id='clip-'+f;let cp=document.getElementById(id);if(!cp){cp=document.createElementNS(SVGNS,'clipPath');cp.id=id;(svg.querySelector('defs')||svg.insertBefore(el('defs',{},svg),svg.firstChild)).appendChild(cp)}
       cp.innerHTML='';const pg=document.createElementNS(SVGNS,'polygon');pg.setAttribute('points',pts(ICON_CLIP[f]));cp.appendChild(pg);wrap=host=el('g',{'clip-path':`url(#${id})`},gIcon)}
     const g=el('g',{class:'ic',id:'ic-'+f},host);g._wrap=wrap;const im=el('image',{href:ICON_SRC[f],x:-50,y:-100,width:100,height:100,preserveAspectRatio:'xMidYMax meet'},g);
-    const lg=el('g',{},gIconLbl);const t=el('text',{x:0,y:12,'text-anchor':'middle',class:'zl icl'},lg);t.textContent=(RENAMED[anchor.replace(/^@/,'')]&&label)?RENAMED[anchor.replace(/^@/,'')]:label;g._lg=lg;
+    const lg=el('g',{},gIconLbl);const t=el('text',{x:0,y:12,'text-anchor':'middle',class:'zl icl'},lg);{const tx=(RENAMED[anchor.replace(/^@/,'')]&&label)?RENAMED[anchor.replace(/^@/,'')]:label;const m=/^(.*?)\s*(\([^)]*\))$/.exec(tx);if(m){const a1=el('tspan',{x:0},t);a1.textContent=m[1];const a2=el('tspan',{x:0,dy:'1.15em'},t);a2.textContent=m[2]}else t.textContent=tx}g._lg=lg; // a note in brackets, e.g. (Coming soon), goes on its own line
     let A=0,F=0;const bk=ICON_BAKED[f];if(bk){x=bk[0];y=bk[1];W=bk[2];A=bk[3]||0;F=bk[4]||0}
     const def=[x,y,W,A,F];const ed=ICON_ED[f];if(ed){x=ed[0];y=ed[1];W=ed[2];A=ed[3]||0;if(ed.length>4)F=ed[4]}
     g._p={x,y,W,minPx,A,F};g._f=f;g._def=def;g._name=anchor[0]==='@'?anchor.slice(1):anchor;IC.push(g)});
@@ -967,45 +977,59 @@ const GX_DOLPHIN='data:image/webp;base64,UklGRq4oAABXRUJQVlA4IKIoAACw2QCdASpZAbg
  <div class="gx-key"><b>Ký hiệu trên bản đồ</b><span><i class="lg lg-walk"></i>Đường vàng cát: lối đi bộ</span><span><i class="lg lg-vroad"></i>Đường nhựa đen: đường ô tô, xe máy</span><span><i class="lg lg-car"></i>Đường xám: đường ô tô, xe máy khác</span><span><i class="lg lg-stair"></i>Cầu thang</span><span><i class="lg lg-exit"></i>Đường cầu vồng: lối ra, đi một chiều</span><span><i class="lg lg-staff"></i>Nét đứt xám: lối nội bộ, khách không đi</span></div>
  <button class="go" id="gx-go">Tìm đường</button>`;
  document.body.appendChild(w);document.getElementById('gx-go').onclick=()=>{w.hidden=true;dispatchEvent(new Event('resize'))}})();
-// ---- guest phone layout: big map, pull-up sheet, quick buttons, large text ----
-(()=>{const app=document.querySelector('.app'),pk=$('gx-peek'),hl=$('gx-hl');
+// ---- guest phone layout, Google-Maps style: big map, a slim from/to card on top while routing, a slim bar at the bottom ----
+(()=>{const app=document.querySelector('.app'),pk=$('gx-peek');
  try{if(localStorage.getItem('tcp-big')==='1'){document.body.classList.add('big');LBLK=1.55}}catch(e){}
  const aa=document.createElement('button');aa.className='btn gx-aa';aa.textContent='Aa';aa.title='Chữ lớn';aa.setAttribute('aria-label','Chữ lớn');
  document.querySelector('.zoom').prepend(aa);
  aa.onclick=()=>{const on=document.body.classList.toggle('big');LBLK=on?1.55:1.25;try{localStorage.setItem('tcp-big',on?'1':'0')}catch(e){}apply();if(typeof declutterSoon==='function')declutterSoon();gx()};
- const setS=s=>{app.dataset.s=s;hl.textContent=s==='open'?'Thu gọn ▾':'';dispatchEvent(new Event('resize'))};
- let y0=null;const h=$('gx-h');h.onclick=()=>setS(app.dataset.s==='open'?'peek':'open');
- h.addEventListener('touchstart',e=>{y0=e.touches[0].clientY},{passive:true});
- h.addEventListener('touchend',e=>{if(y0==null)return;const dy=e.changedTouches[0].clientY-y0;y0=null;if(dy<-30)setS('open');else if(dy>30)setS('peek')});
+ app.dataset.s='peek';
+ // the from/to card lives on top of the map
+ const top=document.createElement('div');top.className='gx-top';top.id='gx-top';top.hidden=true;
+ top.innerHTML='<button class="gx-x gx-tx" id="gx-tx" aria-label="Bỏ chỉ đường">✕</button>';
+ top.prepend(document.querySelector('.rbox'));$('map').appendChild(top);['pointerdown','pointerup','mousedown','touchstart','wheel','click','dblclick'].forEach(ev=>top.addEventListener(ev,e=>e.stopPropagation()));
+ let searching=false;
  const P=n=>state.points.findIndex(q=>q.name===n);
- const here=()=>{if(meFix){const [x,y]=fromLL(meFix[0],meFix[1]);if(Math.hypot(x-900,y-800)<1500)return [x,y,-2]}const a=state.points[rFrom];return a?[...fromLL(a.lat,a.lon),rFrom]:null};
- const go=i=>{if(i<0)return;const h_=here();rTo=i;routeAlt=0;if(h_&&h_[2]===-2)rFrom=-2;$('info').hidden=true;fillRouteSelects();drawRoute();setS('peek');gx()};
+ const inPark=()=>{if(!meFix)return false;const [x,y]=fromLL(meFix[0],meFix[1]);return Math.hypot(x-900,y-800)<1500};
+ const here=()=>{if(inPark()){const [x,y]=fromLL(meFix[0],meFix[1]);return [x,y,-2]}const a=state.points[rFrom];return a?[...fromLL(a.lat,a.lon),rFrom]:null};
+ // like a phone map, start from the guest's own position when the phone shares it and they are in the park; otherwise Quầy vé
+ let waitMe=0;const useMe=()=>{if(inPark()){if(rFrom!==-2){rFrom=-2;fillRouteSelects();drawRoute()}return}
+   if(!meFix&&!waitMe&&navigator.geolocation){try{window.meQuiet=true;startLocate(false)}catch(e){}waitMe=setInterval(()=>{if(inPark()){clearInterval(waitMe);waitMe=0;if(rTo>=0&&rFrom!==-2){rFrom=-2;fillRouteSelects();drawRoute()}}},1000);setTimeout(()=>{clearInterval(waitMe);waitMe=0},25000)}};
+ const go=i=>{if(i<0)return;rTo=i;routeAlt=0;if(inPark())rFrom=-2;searching=false;$('info').hidden=true;fillRouteSelects();drawRoute();useMe();gx()};
  const CH=[['🚻','Nhà vệ sinh','wc'],['🍽','Ăn uống','Vườn ẩm thực'],['🐬','Cá heo & Hải cẩu','Biểu diễn Cá heo & Hải cẩu'],['🦍','King Kong Park','King Kong Park'],['☕','Lakeside Coffee','Lakeside Coffee'],['🛴','Strider Park','Strider Park - Xe thăng bằng'],['🪵','Khu trò chơi gỗ','Khu trò chơi gỗ ngoài trời'],['🚪','Lối ra','Lối ra']];
  const nearestWC=()=>{const h_=here();let bi=-1,bd=Infinity;state.points.forEach((q,i)=>{if(q.type!=='wc')return;const [x,y]=fromLL(q.lat,q.lon);const d=h_?Math.hypot(x-h_[0],y-h_[1]):0;if(d<bd){bd=d;bi=i}});return bi};
  const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+ const chips=()=>`<div class="gx-chips">${CH.map((c,i)=>`<button data-c="${i}">${c[0]} ${c[1]}</button>`).join('')}</div>`;
  let busy=false;
- function gx(){if(busy||app.dataset.s==='open')return;busy=true;try{const info=$('info');let html='';
-  if(!info.hidden&&state.points[sel]){const p=state.points[sel];
-   const ty=TYPES[p.type]||TYPES.other;const d1=($('info-desc').textContent||'').split(/(?<=[.!?])\s/)[0];
+ function gx(){if(busy)return;busy=true;try{const info=$('info');let html='';const routing=rTo>=0&&!!state.points[rTo];
+  top.hidden=!(routing||searching);app.classList.toggle('gx-routing',!top.hidden);
+  if(!info.hidden&&state.points[sel]){const p=state.points[sel];const ty=TYPES[p.type]||TYPES.other;const d1=($('info-desc').textContent||'').split(/(?<=[.!?])\s/)[0];
    html=`<div class="gx-row"><div class="gx-info" style="flex:1;min-width:0"><strong>${esc(p.name)}</strong><span class="ty" style="background:${ty[1]}">${esc(ty[0])}</span><p>${esc(d1)}</p></div><button class="gx-x" id="gx-x" aria-label="Đóng">✕</button></div><div class="gx-row"><button class="btn primary" id="gx-to" style="flex:1">Chỉ đường đến đây</button></div>`}
-  else if(rTo>=0&&state.points[rTo]){const eta=document.querySelector('#r-sum .eta');const lkc=document.querySelector('#r-sum .lkc');const go_=$('r-go');const mw=$('m-walk'),md=$('m-drive');
-   html=(lkc?lkc.outerHTML.replace(/id="lk-/g,'data-k="lk-'):'')+`<div class="gx-row"><div style="flex:1;min-width:0"><div class="gx-eta">${eta?eta.innerHTML:esc($('r-sum').textContent.slice(0,80))}</div><div class="gx-to">Đến <b>${esc(state.points[rTo].name)}</b></div></div><button class="gx-x" id="gx-x" aria-label="Bỏ chỉ đường">✕</button></div>`+
-    (!$('r-modes').hidden?`<div class="gx-modes"><button data-k="m-walk" aria-pressed="${mw.getAttribute('aria-pressed')}">🚶 ${esc($('m-walk-t').textContent)}</button><button data-k="m-drive" aria-pressed="${md.getAttribute('aria-pressed')}" ${md.disabled?'disabled':''}>🛵🚗 ${esc($('m-drive-t').textContent)}</button></div>`:'')+
-    (go_?`<div class="gx-row"><button class="btn primary" data-k="r-go" style="flex:1">${esc(go_.textContent)}</button></div>`:'')}
-  else html=`<button class="gx-search" id="gx-s">🔍 Bạn muốn đi đâu?</button><div class="gx-chips">${CH.map((c,i)=>`<button data-c="${i}">${c[0]} ${c[1]}</button>`).join('')}</div>`;
+  else if(routing){const sum=$('r-sum'),eta=sum.querySelector('.eta');const dist=eta?((eta.querySelector('span')||{}).textContent||'').replace(/[()]/g,'').trim():'';
+   const lkc=sum.querySelector('.lkc');const go_=$('r-go');const sw=$('r-swap');const mw=$('m-walk'),md=$('m-drive');const walkOn=mw.getAttribute('aria-pressed')==='true';const etaT=((eta&&eta.querySelector('b'))||{}).textContent||'';
+   const nost=$('r-nostair');const showNs=!$('r-nostair-row').hidden;
+   if(!eta){html=`<div class="gx-msg">${esc(sum.textContent.slice(0,140))}</div>`}
+   else html=(lkc?lkc.outerHTML.replace(/id="lk-/g,'data-k="lk-'):'')+
+    `<div class="gx-modes"><button data-k="m-walk" aria-pressed="${walkOn}">🚶 ${esc(walkOn&&etaT?etaT:$('m-walk-t').textContent)}${walkOn&&dist?' · '+esc(dist):''}</button><button data-k="m-drive" aria-pressed="${!walkOn}" ${md.disabled?'disabled':''}>🛵🚗 ${esc(!walkOn&&etaT?etaT:$('m-drive-t').textContent)}${!walkOn&&dist?' · '+esc(dist):''}</button></div>`+
+    `<div class="gx-row gx-sub">${sw?`<button class="btn" data-k="r-swap">${esc(sw.textContent.replace(/\s*\(.*\)/,''))}</button>`:''}${showNs?`<button class="btn gx-ns" id="gx-ns" aria-pressed="${nost.checked}" title="Xe đẩy, xe lăn (tránh cầu thang)">♿ ${nost.checked?'Tránh cầu thang':'Xe đẩy'}</button>`:''}${go_?`<button class="btn primary" data-k="r-go" style="flex:1">${esc(go_.textContent)}</button>`:''}</div>`}
+  else if(searching)html=`<div class="gx-msg">Chọn điểm đến ở ô phía trên, hoặc bấm nhanh:</div>`+chips();
+  else html=`<button class="gx-search" id="gx-s">🔍 Bạn muốn đi đâu?</button>`+chips();
   pk.innerHTML=html;
   pk.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const c=CH[+b.dataset.c];go(c[2]==='wc'?nearestWC():P(c[2]))});
   pk.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const t=$(b.dataset.k);if(t&&!t.disabled)t.click();setTimeout(gx,60)});
-  const s_=$('gx-s');if(s_)s_.onclick=()=>{setS('open');setTimeout(()=>$('r-to').focus(),100)};
-  const m=$('gx-more');if(m)m.onclick=()=>{setS('open');const d=document.querySelector('#r-sum .steps');if(d)d.open=true};
-  const t=$('gx-to');if(t)t.onclick=()=>{$('info-to').click();setS('peek');setTimeout(gx,60)};
-  const x=$('gx-x');if(x)x.onclick=()=>{if(!info.hidden){info.hidden=true}else{rTo=-1;meFollow=false;fillRouteSelects();drawRoute();gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteGhost.innerHTML='';$('navb').hidden=true}setTimeout(gx,0)}}finally{busy=false}}
+  const s_=$('gx-s');if(s_)s_.onclick=()=>{searching=true;if(inPark())rFrom=-2;fillRouteSelects();gx();useMe();setTimeout(()=>{const t=$('r-to');t.focus();try{t.showPicker&&t.showPicker()}catch(e){}},150)};
+  const ns=$('gx-ns');if(ns)ns.onclick=()=>{const c=$('r-nostair');c.checked=!c.checked;c.dispatchEvent(new Event('change'));setTimeout(gx,60)};
+  const t=$('gx-to');if(t)t.onclick=()=>{$('info-to').click();searching=false;useMe();setTimeout(gx,60)};
+  const x=$('gx-x');if(x)x.onclick=()=>{info.hidden=true;setTimeout(gx,0)}}finally{busy=false}}
  window.gx=gx;
- const mo=()=>{if(app.dataset.s!=='open')setTimeout(gx,0)};
+ $('zloc').addEventListener('click',()=>{window.meQuiet=false},true);
+ $('gx-tx').onclick=()=>{searching=false;rTo=-1;meFollow=false;fillRouteSelects();drawRoute();gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteGhost.innerHTML='';setTimeout(gx,0)};
+ $('r-to').addEventListener('change',()=>{searching=false;useMe();setTimeout(gx,60)});
+ $('r-from').addEventListener('change',()=>setTimeout(gx,60));
+ const mo=()=>setTimeout(gx,0);
  new MutationObserver(mo).observe($('r-sum'),{childList:true,subtree:true});
  new MutationObserver(mo).observe($('info'),{attributes:true,attributeFilter:['hidden']});
- setS('peek');gx();
- // open at the park itself, not its surroundings
+ gx();
  const home=()=>{const Q=state.points.flatMap(q=>fromLL(q.lat,q.lon));frameW(Q.concat([420,820,440,770,700,1090,1240,900]),24,0.05)};setTimeout(home,80);setTimeout(home,400);$('zfit').onclick=home;
 })();
 </script>
