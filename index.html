@@ -104,6 +104,11 @@ svg{display:block;width:100%;height:100%}
 .rmodes button[aria-pressed="true"]{background:#d3e3fd;border-color:#d3e3fd;color:#041e49}.rmodes button:disabled{opacity:.45;cursor:default}
 @media (max-width:640px){.sheet{max-height:48%;padding:10px 14px;gap:8px}.sel span{display:none}}
 .rsum small{font-weight:400;color:var(--muted)}
+.steps{margin-top:2px}.steps summary{cursor:pointer;font-weight:600;color:var(--route);padding:6px 0;list-style:none}.steps summary::-webkit-details-marker{display:none}
+.steps ol{list-style:none;margin:0;padding:0}.steps li{display:grid;grid-template-columns:30px 1fr;gap:2px 8px;padding:8px 0;border-top:1px solid var(--panel-line)}
+.steps .ic{grid-row:span 2;font-size:20px;line-height:1;text-align:center;color:var(--route)}.steps .tx{font-weight:500}.steps .ds{font-size:12px;color:var(--muted)}
+.navb{position:absolute;left:10px;right:64px;top:10px;z-index:5;display:flex;align-items:center;gap:12px;background:#0b6b3a;color:#fff;border-radius:14px;padding:10px 14px;box-shadow:0 4px 14px rgba(0,0,0,.25);font:600 16px/1.25 system-ui,sans-serif}
+.navb .ic{font-size:30px;line-height:1}.navb .d{font-size:20px;font-weight:700;white-space:nowrap}.navb .t{font-weight:500;font-size:14px;opacity:.95}
 .toast{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
 textarea.dump{width:100%;min-height:70px;font:12px ui-monospace,Menlo,monospace;border:1px solid var(--panel-line);border-radius:8px;background:var(--panel);color:var(--ink);padding:8px;box-sizing:border-box}
@@ -132,6 +137,7 @@ svg.far .mt{display:none}
     <svg id="svg" xmlns="http://www.w3.org/2000/svg">
       <g id="world"></g>
     </svg>
+    <div class="navb" id="navb" hidden></div>
     <div class="coord" id="coord" style="display:none">Chạm vào bản đồ để xem tọa độ</div>
     <div class="zoom">
       <button class="btn" id="zin" aria-label="Phóng to">+</button>
@@ -421,7 +427,7 @@ mapEl.addEventListener('wheel',e=>{e.preventDefault();if(mode==='icon'&&icSel&&e
 const ptrs=new Map();let icDrag=null;let moved=0,pinch=null,hit=null,dragging=false;
 mapEl.addEventListener('pointerdown',e=>{if(e.target.closest('.btn,.coord'))return;mapEl.setPointerCapture(e.pointerId);
   if(mode==='icon'&&ptrs.size===0){const ic=e.target.closest&&e.target.closest('.ic');if(ic&&ic._f){icSel=ic;const [wx,wy]=clientToWorld(e.clientX,e.clientY);icDrag={g:ic,ox:ic._p.x-wx,oy:ic._p.y+wy};ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;icInfo();iconScale();return}}
-  if(typeof meFollow!=='undefined'&&meFollow){meFollow=false;const g=document.getElementById('r-go');if(g)g.textContent='▶ Bắt đầu'}const m=e.target.closest&&e.target.closest('.um');hit=(m&&m._idx!=null&&ptrs.size===0)?m:null;dragging=!!(hit&&mode!=='view');ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y)}}mapEl.classList.add('drag')});
+  if(typeof meFollow!=='undefined'&&meFollow){meFollow=false;document.getElementById('navb').hidden=true;const g=document.getElementById('r-go');if(g)g.textContent='▶ Bắt đầu'}const m=e.target.closest&&e.target.closest('.um');hit=(m&&m._idx!=null&&ptrs.size===0)?m:null;dragging=!!(hit&&mode!=='view');ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y)}}mapEl.classList.add('drag')});
 mapEl.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const p=ptrs.get(e.pointerId);const dx=e.clientX-p.x,dy=e.clientY-p.y;
   if(icDrag&&ptrs.size===1){const [wx,wy]=clientToWorld(e.clientX,e.clientY);icDrag.g._p.x=wx+icDrag.ox;icDrag.g._p.y=-wy+icDrag.oy;moved+=Math.abs(dx)+Math.abs(dy);p.x=e.clientX;p.y=e.clientY;iconScale();return}
   if(ptrs.size===1&&dragging){const [wx,wy]=clientToWorld(e.clientX,e.clientY);hit._x=wx;hit._y=-wy;hit.setAttribute('transform',`translate(${wx} ${wy}) ${UP} scale(${view.s})`);moved+=Math.abs(dx)+Math.abs(dy);p.x=e.clientX;p.y=e.clientY;return}
@@ -671,18 +677,19 @@ function fillRouteSelects(){['r-from','r-to'].forEach(id=>{const s=$(id),v=s.val
 function nearestEdge(x,y,noStair,ok,isEnd){let best=null;
   for(let u=0;u<G.adj.length;u++)for(const [v,w,st] of G.adj[u]){if(v<u&&G.adj[v].some(e=>e[0]===u))continue;if(noStair&&st===1)continue;if(ok&&!ok(st))continue;if(st===8&&w<0.01)continue;if(st===3&&!isEnd)continue;
     const [x0,y0]=G.xy[u],[x1,y1]=G.xy[v],dx=x1-x0,dy=y1-y0,L2=dx*dx+dy*dy||1;const t=Math.max(0,Math.min(1,((x-x0)*dx+(y-y0)*dy)/L2));const qx=x0+t*dx,qy=y0+t*dy,d=Math.hypot(x-qx,y-qy);
-    const dd=d+(!ok&&st===7?25:0);if(!best||dd<best.dd)best={u,v,t,q:[qx,qy],d,dd,len:Math.sqrt(L2),two:G.adj[v].some(e=>e[0]===u)}}return best}
+    const dd=d+(!ok&&st===7?25:0);if(!best||dd<best.dd)best={u,v,t,q:[qx,qy],d,dd,len:Math.sqrt(L2),two:G.adj[v].some(e=>e[0]===u),endAny:!!isEnd&&st===3}}return best}
 function routeBetween(a,b,noStair,pen,ok){const n=G.xy.length,D=new Float64Array(n).fill(Infinity),Pv=new Int32Array(n).fill(-1),done=new Uint8Array(n);
   // sources: the two ends of the start edge (only the forward end if that edge is one-way)
   D[a.v]=(1-a.t)*a.len;if(a.two)D[a.u]=a.t*a.len;
   for(;;){let u=-1,bd=Infinity;for(let i=0;i<n;i++)if(!done[i]&&D[i]<bd){bd=D[i];u=i}if(u<0)break;done[u]=1;
-    for(const [v,w,st] of G.adj[u]){if(noStair&&st===1)continue;if(ok&&!ok(st))continue;const nd=bd+w*(pen&&pen.has(u<v?u+','+v:v+','+u)?4:1);if(nd<D[v]){D[v]=nd;Pv[v]=u}}}
+    const es=b.endAny?G.adj[u].concat(radj()[u].filter(e=>e[2]===3).map(([v,w])=>[v,w*3,3])):G.adj[u];
+    for(const [v,w,st] of es){if(noStair&&st===1)continue;if(ok&&!ok(st))continue;const nd=bd+w*(pen&&pen.has(u<v?u+','+v:v+','+u)?4:1);if(nd<D[v]){D[v]=nd;Pv[v]=u}}}
   // same edge, walking straight along it
   let bestLen=Infinity,end=-1,direct=false;
   if((a.u===b.u&&a.v===b.v)&&(b.t>=a.t||a.two)){bestLen=Math.abs(b.t-a.t)*a.len;direct=true}
   // arrive at the end edge from u (forward) or from v (if two-way)
   const cu=D[b.u]+b.t*b.len;if(cu<bestLen){bestLen=cu;end=b.u;direct=false}
-  if(b.two){const cv=D[b.v]+(1-b.t)*b.len;if(cv<bestLen){bestLen=cv;end=b.v;direct=false}}
+  if(b.two||b.endAny){const cv=D[b.v]+(1-b.t)*b.len;if(cv<bestLen){bestLen=cv;end=b.v;direct=false}}
   if(!isFinite(bestLen))return null;
   const nodes=[];if(!direct)for(let v=end;v!==-1;v=Pv[v])nodes.push(v);nodes.reverse();
   // real walking length (penalties only steer the alternative, they are not distance)
@@ -735,7 +742,45 @@ function driveTrip(P,Q){
   const line=[board.q,...r.nodes.map(i=>G.xy[i]),alight.q];
   if(w1&&w1.len<=15)w1=null;if(w2&&w2.len<=15)w2=null;
   const wl=(w1?w1.len:0)+(w2?w2.len:0);return {len:r.len,line,w1,w2,walk:wl,first:board,last:alight}}
-function drawRoute(keepView){gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteGhost.innerHTML='';gWalkGhost.style.display='';const sum=$('r-sum');$('r-modes').hidden=true;
+// ---- turn-by-turn steps, phone-map style: an instruction only where paths meet (a bend in a single path needs none) ----
+let NODEMAP=null;const nodeOf=p=>{if(!NODEMAP)NODEMAP=new Map(G.xy.map((q,i)=>[q,i]));return NODEMAP.get(p)};
+function landmarkNear(p,skip,r){let best=null,bd=r||35;state.points.forEach(q=>{if(skip.includes(q)||q.type==='wc'||/^Lối ra/.test(q.name))return;const [x,y]=fromLL(q.lat,q.lon);const d=Math.hypot(x-p[0],y-p[1]);if(d<bd){bd=d;best=q.name}});return best}
+function stepsOf(line,A,B){
+  const P=[];for(const p of line)if(!P.length||Math.hypot(p[0]-P[P.length-1][0],p[1]-P[P.length-1][1])>0.3)P.push(p);
+  if(P.length<2)return [];
+  const sl=k=>Math.hypot(P[k+1][0]-P[k][0],P[k+1][1]-P[k][1]);const cum=[0];for(let k=1;k<P.length;k++)cum.push(cum[k-1]+sl(k-1));
+  const kindAt=k=>{const u=nodeOf(P[k]),v=nodeOf(P[k+1]);if(u==null||v==null)return 0;const e=G.adj[u].find(e=>e[0]===v)||G.adj[v].find(e=>e[0]===u);return e?(e[2]===8||e[2]===2?0:e[2]):0};
+  const deg=k=>{const u=nodeOf(P[k]);if(u==null)return 0;const n=new Set(G.adj[u].map(e=>e[0]));radj()[u].forEach(e=>n.add(e[0]));return n.size};
+  const dir=(k,back)=>{let i=k,acc=0;if(back){while(i>0&&acc<10){acc+=sl(i-1);i--}}else{while(i<P.length-1&&acc<10){acc+=sl(i);i++}}
+    const dx=back?P[k][0]-P[i][0]:P[i][0]-P[k][0],dy=back?P[k][1]-P[i][1]:P[i][1]-P[k][1],L=Math.hypot(dx,dy)||1;return [dx/L,dy/L]};
+  const skip=[A,B];const lm=(k)=>{const n=landmarkNear(P[k],skip);return n?' tại '+n:''};
+  const kindTx={1:['🪜','Đi cầu thang'],3:['🌈','Theo đường cầu vồng (lối ra một chiều)'],7:['⚠','Đi dọc mép đường xe, chú ý ô tô, xe máy'],10:['⚠','Đi dọc mép đường xe, chú ý ô tô, xe máy']};
+  const turnW=ang=>{const m=Math.abs(ang),L=ang>0;return m>=140?['↶','Quay lại']:m>=60?[L?'↰':'↱',L?'Rẽ trái':'Rẽ phải']:m>=28?[L?'↖':'↗',L?'Chếch sang trái':'Chếch sang phải']:null};
+  const restExit=k=>{for(let i=k;i<P.length-1;i++){const t=kindAt(i);if(t!==3&&t!==10&&t!==7&&t!==0)return false;if(t===0&&i>k+2&&i<P.length-2)return false}return true};
+  const st=[{at:0,ic:'●',tx:'Xuất phát'+(A&&!A.me?' từ '+A.name:' từ vị trí của bạn')}];
+  for(let k=1;k<P.length-1;k++){
+    const kp=kindAt(k-1),kn=kindAt(k);let ang=0,turn=false,note=null,nic=null;
+    if(deg(k)>=3){const a=dir(k,true),b=dir(k,false);const A_=(v)=>Math.atan2(a[0]*v[1]-a[1]*v[0],a[0]*v[0]+a[1]*v[1])*180/Math.PI;ang=A_(b);turn=!!turnW(ang);
+      // the obvious way on (the straightest branch) needs no instruction, like a phone map's silence on "continue"
+      if(turn&&Math.abs(ang)<60){const u=nodeOf(P[k]),pv=nodeOf(P[k-1]),nx=nodeOf(P[k+1]);const nb=new Set(G.adj[u].map(e=>e[0]));radj()[u].forEach(e=>nb.add(e[0]));
+        let straighter=false;nb.forEach(n=>{if(n===pv||n===nx)return;const q=G.xy[n],dx=q[0]-P[k][0],dy=q[1]-P[k][1],L=Math.hypot(dx,dy)||1;if(Math.abs(A_([dx/L,dy/L]))<Math.abs(ang)-10)straighter=true});
+        if(!straighter){turn=false;ang=0}}}
+    const same=(x,y)=>x===y||((x===7||x===10)&&(y===7||y===10));
+    if(!same(kn,kp)){if(kn===1){nic='🪜';note='đi cầu thang'}else if(kn===3){nic='🌈';note=restExit(k)?'theo đường cầu vồng ra cổng':'đi theo đoạn đường cầu vồng'}
+      else if(kn===7||kn===10){nic='⚠';note='đi dọc mép đường xe, chú ý ô tô, xe máy'}else if((kp===7||kp===10)&&kn===0){nic='↑';note='rời đường xe, vào lối đi bộ'}}
+    if(!turn&&!note)continue;const last=st[st.length-1];
+    if(last.at>0&&cum[k]-cum[last.at]<8){last.ang=(last.ang||0)+ang;if(note)last.notes.push(note);last.nic=last.nic||nic;continue}
+    st.push({at:k,ang,notes:note?[note]:[],nic})}
+  st.forEach((x,i)=>{if(i===0)return;const t=turnW(x.ang||0);const lmk=landmarkNear(P[x.at],skip);
+    let ahead=null;if(t&&!lmk){for(let i=x.at+1;i<P.length&&cum[i]-cum[x.at]<250&&!ahead;i++){const n=landmarkNear(P[i],skip,20);if(n)ahead=n}if(!ahead&&cum[P.length-1]-cum[x.at]<160&&B)ahead=B.name}
+    let tx=t?t[1]+(lmk?' tại '+lmk:ahead?', hướng về '+ahead:''):'';x.ic=t?t[0]:x.nic;
+    x.notes.forEach(n=>{tx=tx?tx+', '+n:n.charAt(0).toUpperCase()+n.slice(1)+(lmk?' tại '+lmk:'')});x.tx=tx});
+  for(let i=st.length-1;i>0;i--)if(!st[i].tx)st.splice(i,1);
+  st.push({at:P.length-1,ic:'📍',tx:'Đến '+(B?B.name:'nơi')});
+  st.forEach((x,i)=>{x.d=i<st.length-1?cum[st[i+1].at]-cum[x.at]:0;x.from=cum[x.at]});return st}
+function showNav(st,A){const nb=$('navb');if(!(meFollow&&A&&A.me&&st&&st.length>1)){nb.hidden=true;return}
+  const nx=st[1];nb.hidden=false;nb.innerHTML=`<span class="ic">${nx.ic}</span><div><div class="d">${fmtM(nx.from)}</div><div class="t">${nx.tx.replace(/[&<>]/g,'')}</div></div>`}
+function drawRoute(keepView){$('navb').hidden=true;gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteGhost.innerHTML='';gWalkGhost.style.display='';const sum=$('r-sum');$('r-modes').hidden=true;
   let A=state.points[rFrom];const B=state.points[rTo];
   if(rFrom===-2){if(!B){sum.textContent='Chọn điểm đến để xem đường đi.';return}
     if(!meFix){sum.textContent='Đang lấy vị trí của bạn…';startLocate(false);return}
@@ -744,14 +789,14 @@ function drawRoute(keepView){gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteG
   if(!A||!B||rFrom===rTo){sum.textContent='Chọn điểm đến để xem đường đi.';return}
   const noStair=$('r-nostair').checked;
   const [ax,ay]=A.entry?fromLL(...A.entry):fromLL(A.lat,A.lon),[bx,by]=B.entry?fromLL(...B.entry):fromLL(B.lat,B.lon);
-  if(A.me&&Math.hypot(ax-bx,ay-by)<20){sum.innerHTML='<b>Bạn đã đến nơi.</b>';return}
+  if(A.me&&Math.hypot(ax-bx,ay-by)<20){sum.innerHTML='<b>Bạn đã đến nơi.</b>';if(meFollow){const nb=$('navb');nb.hidden=false;nb.innerHTML='<span class="ic">📍</span><div><div class="d">Đã đến</div><div class="t">'+B.name+'</div></div>'}return}
   const stops=[[ax,ay]];(B.via||[]).forEach(n=>{const p=state.points.find(q=>q.name===n);if(p&&p!==A)stops.push(fromLL(p.lat,p.lon))});stops.push([bx,by]);
   // both modes are planned so each chip can show its time, like a phone map
   const best=walkTrip(stops,noStair,null);const drive=driveTrip([ax,ay],[bx,by]);
   const walkMin=best?mins(best.len,WALK_SPEED):null;
   let driveOk=drive&&drive.len>150;const driveMin=driveOk?mins(drive.len,DRIVE_SPEED)+mins(drive.walk,WALK_SPEED)*(drive.walk>20?1:0):null;
   // like a phone map: offer the car only where it helps (clearly faster, and not mostly walking anyway)
-  if(driveOk&&best&&(driveMin>=walkMin-2||drive.walk>Math.max(150,best.len*0.4)))driveOk=false;
+  if(driveOk&&best&&(driveMin>walkMin||drive.walk>Math.max(150,best.len*0.4)))driveOk=false;
   if(rMode==='drive'&&!driveOk)rMode='walk';
   $('r-modes').hidden=false;$('m-walk').setAttribute('aria-pressed',rMode==='walk');$('m-drive').setAttribute('aria-pressed',rMode==='drive');
   $('m-walk-t').textContent=walkMin?walkMin+' phút':'—';$('m-drive-t').textContent=driveOk?driveMin+' phút':'không cần';$('m-drive').disabled=!driveOk;
@@ -797,6 +842,8 @@ function drawRoute(keepView){gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteG
     {let rd=0;for(let k=1;k<line.length;k++){const u=G.xy.findIndex(p=>p===line[k-1]),v=G.xy.findIndex(p=>p===line[k]);if(u>=0&&v>=0&&G.adj[u].some(([w,,st])=>w===v&&(st===7||st===10)))rd+=Math.hypot(line[k][0]-line[k-1][0],line[k][1]-line[k-1][1])}
      if(rd>60)html+=`<small>⚠ Có ${fmtM(rd)} đi bộ dọc mép đường xe, chú ý ô tô, xe máy.</small>`}
     if(passed.length)html+=`<div class="via">Đi qua: ${passed.map(x=>esc(x[1])).join(' → ')}</div>`;
+    const steps=stepsOf(A.me?[[ax,ay],...line]:line,A,B);showNav(steps,A);
+    if(steps.length>2)html+=`<details class="steps"${meFollow?' open':''}><summary>Xem từng bước (${steps.length} bước) ▾</summary><ol>${steps.map(x=>`<li><span class="ic">${x.ic}</span><span class="tx">${esc(x.tx)}</span><span class="ds">${x.d?'Đi tiếp '+fmtM(x.d):''}</span></li>`).join('')}</ol></details>`;
     if(other)html+=`<button class="btn" id="r-swap">${routeAlt?'↩ Về đường nhanh nhất':'Đường khác'} · ${mins(other.len,WALK_SPEED)} phút (${fmtM(other.len)})</button>`;
   }
   if(A.me)html+=`<button class="btn primary" id="r-go">${meFollow?'■ Dừng theo dõi':'▶ Bắt đầu'}</button>`;
