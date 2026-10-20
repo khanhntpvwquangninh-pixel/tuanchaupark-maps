@@ -1,5 +1,34 @@
 <!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="description" content="Bản đồ Tuần Châu Park: xem các khu vui chơi, định vị và chỉ đường đi bộ."><meta name="theme-color" content="#0a62b0"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Bản đồ Tuần Châu Park</title>
+<style>
+.top{padding:8px 14px}.top .sub{display:none}.top h1{font-size:17px}
+.sheet{max-height:none;padding:0 16px 14px;gap:10px;border-radius:18px 18px 0 0;box-shadow:0 -6px 18px rgba(0,0,0,.12);border-top:0;position:relative}
+.gx-h{display:flex;justify-content:center;align-items:center;padding:8px 0 2px;cursor:pointer;touch-action:none;position:sticky;top:0;background:var(--panel);z-index:3;margin:0 -16px}
+.gx-h i{width:44px;height:5px;border-radius:3px;background:#c4cad1}
+.gx-h b{position:absolute;right:14px;font:600 13px var(--f-ui);color:var(--muted)}
+.app[data-s=peek] .sheet>*:not(.gx-h):not(.gx-peek){display:none!important}
+.app[data-s=peek] .sheet{overflow:hidden}
+.app[data-s=open] .gx-peek{display:none}
+.app[data-s=open] .sheet{position:absolute;left:0;right:0;bottom:0;max-height:80%;overflow:auto;z-index:6}
+.gx-peek{display:flex;flex-direction:column;gap:10px}
+.gx-search{display:flex;align-items:center;gap:10px;border:1.5px solid var(--panel-line);border-radius:28px;padding:13px 18px;font:600 18px var(--f-ui);color:var(--muted);background:var(--panel);width:100%;text-align:left;cursor:pointer}
+.gx-chips{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px 2px;scrollbar-width:none}.gx-chips::-webkit-scrollbar{display:none}
+.gx-chips button{flex:none;display:flex;align-items:center;gap:6px;border:1px solid var(--panel-line);border-radius:22px;padding:0 15px;min-height:46px;font:600 15px var(--f-ui);background:var(--panel);color:var(--ink);cursor:pointer}
+.gx-info strong{font-size:19px}.gx-info p{margin:4px 0 0;color:var(--muted);font-size:15px;line-height:1.4;max-height:4.2em;overflow:hidden}
+.gx-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.gx-row .btn{min-height:48px;font-size:16px;border-radius:24px;padding:0 18px}
+.gx-eta{font-size:16px;color:var(--muted)}.gx-eta b{font-size:28px;color:#188038;margin-right:4px}.gx-to{font-size:15px}.gx-to b{color:var(--ink)}
+.gx-x{margin-left:auto;width:44px;height:44px;border-radius:22px;border:1px solid var(--panel-line);background:var(--panel);font-size:18px;color:var(--muted);cursor:pointer;flex:none}
+.gx-peek .lkc{margin:0}.gx-modes{display:flex;gap:8px}.gx-modes button{flex:1;min-height:44px;border-radius:22px;border:1px solid var(--panel-line);background:var(--panel);font:600 15px var(--f-ui);color:var(--ink)}.gx-modes button[aria-pressed=true]{background:#e8f0fe;border-color:#1a73e8;color:#174ea6}.gx-modes button:disabled{opacity:.45}
+.zoom{gap:8px}.zoom .btn{width:46px;height:46px;border-radius:12px;font-size:20px}
+#zloc{width:52px;height:52px;border-radius:26px;box-shadow:0 3px 10px rgba(0,0,0,.18);margin-left:-3px}
+.gx-aa{font:700 18px var(--f-ui)!important}
+.legend{left:12px!important;bottom:auto!important;top:12px!important;border-radius:20px!important;padding:0!important;height:auto!important;max-height:none}
+.legend:not([open]) summary{width:42px;height:42px;justify-content:center;font-size:0}.legend:not([open]) summary::before{display:none}.legend:not([open]) summary::after{content:'?';font-size:20px;font-weight:700}
+.legend[open]{padding:8px 10px!important}
+body.big .sheet{font-size:17px}body.big .rsum .eta b{font-size:26px}body.big .steps .tx{font-size:17px}body.big .list li{font-size:17px}body.big select{font-size:18px}
+</style>
+
 <style>#list .ok,#list .del,#list li>button{display:none!important}</style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
 <style>
@@ -153,7 +182,7 @@ svg.far .mt{display:none}
     <div class="toast" id="toast"></div>
   </div>
 
-  <section class="sheet" id="sheet">
+  <section class="sheet" id="sheet"><div class="gx-h" id="gx-h" role="button" aria-label="Kéo lên để xem thêm"><i></i><b id="gx-hl"></b></div><div class="gx-peek" id="gx-peek"></div>
     <div class="info" id="info" hidden>
       <div class="info-head"><strong id="info-name"></strong><span class="chip" id="info-type"></span></div>
       <p class="hint" id="info-desc"></p>
@@ -404,7 +433,7 @@ function declutter(){
 try{if(matchMedia('(min-width:700px)').matches)document.getElementById('legend').open=true}catch(e){}
 document.getElementById('legend').addEventListener('toggle',()=>declutterSoon());
 // label size follows zoom: smaller when the whole park is in view, larger when zoomed in close
-const LBL_FS=()=>Math.min(15,Math.max(8.5,11.5*Math.pow(0.25/view.s,0.3)));
+let LBLK=1.25;const LBL_FS=()=>LBLK*Math.min(15,Math.max(8.5,11.5*Math.pow(0.25/view.s,0.3)));
 function apply(){
   view.s=Math.min(Math.max(view.s,0.05),12);
   const [w,h]=size();
@@ -905,6 +934,46 @@ const gRouteGhost=el('g',{'pointer-events':'none'});
 [gRoute,gIcon,gWalkGhost,gRouteGhost,gIconLbl,gRoutePins,gUser].forEach(g=>world.appendChild(g));
 Object.entries(ICON_SRC).forEach(([f,src])=>{const im=new Image();im.onload=()=>{ICON_AR[f]=im.naturalHeight/im.naturalWidth;declutterSoon()};im.src=src});
 requestAnimationFrame(()=>{drawZones();drawIcons();fit();render();rFrom=Math.max(0,state.points.findIndex(p=>p.name==='Quầy vé'));fillRouteSelects()});
+// ---- guest phone layout: big map, pull-up sheet, quick buttons, large text ----
+(()=>{const app=document.querySelector('.app'),pk=$('gx-peek'),hl=$('gx-hl');
+ try{if(localStorage.getItem('tcp-big')==='1'){document.body.classList.add('big');LBLK=1.55}}catch(e){}
+ const aa=document.createElement('button');aa.className='btn gx-aa';aa.textContent='Aa';aa.title='Chữ lớn';aa.setAttribute('aria-label','Chữ lớn');
+ document.querySelector('.zoom').prepend(aa);
+ aa.onclick=()=>{const on=document.body.classList.toggle('big');LBLK=on?1.55:1.25;try{localStorage.setItem('tcp-big',on?'1':'0')}catch(e){}apply();if(typeof declutterSoon==='function')declutterSoon();gx()};
+ const setS=s=>{app.dataset.s=s;hl.textContent=s==='open'?'Thu gọn ▾':'';dispatchEvent(new Event('resize'))};
+ let y0=null;const h=$('gx-h');h.onclick=()=>setS(app.dataset.s==='open'?'peek':'open');
+ h.addEventListener('touchstart',e=>{y0=e.touches[0].clientY},{passive:true});
+ h.addEventListener('touchend',e=>{if(y0==null)return;const dy=e.changedTouches[0].clientY-y0;y0=null;if(dy<-30)setS('open');else if(dy>30)setS('peek')});
+ const P=n=>state.points.findIndex(q=>q.name===n);
+ const here=()=>{if(meFix){const [x,y]=fromLL(meFix[0],meFix[1]);if(Math.hypot(x-900,y-800)<1500)return [x,y,-2]}const a=state.points[rFrom];return a?[...fromLL(a.lat,a.lon),rFrom]:null};
+ const go=i=>{if(i<0)return;const h_=here();rTo=i;routeAlt=0;if(h_&&h_[2]===-2)rFrom=-2;$('info').hidden=true;fillRouteSelects();drawRoute();setS('peek');gx()};
+ const CH=[['🚻','Nhà vệ sinh','wc'],['🍽','Ăn uống','Vườn ẩm thực'],['🐬','Cá heo & Hải cẩu','Biểu diễn Cá heo & Hải cẩu'],['🦍','King Kong Park','King Kong Park'],['☕','Lakeside Coffee','Lakeside Coffee'],['🛴','Strider Park','Strider Park - Xe thăng bằng'],['🪵','Khu trò chơi gỗ','Khu trò chơi gỗ ngoài trời'],['🚪','Lối ra','Lối ra']];
+ const nearestWC=()=>{const h_=here();let bi=-1,bd=Infinity;state.points.forEach((q,i)=>{if(q.type!=='wc')return;const [x,y]=fromLL(q.lat,q.lon);const d=h_?Math.hypot(x-h_[0],y-h_[1]):0;if(d<bd){bd=d;bi=i}});return bi};
+ const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+ let busy=false;
+ function gx(){if(busy||app.dataset.s==='open')return;busy=true;try{const info=$('info');let html='';
+  if(!info.hidden&&state.points[sel]){const p=state.points[sel];
+   html=`<div class="gx-row"><div class="gx-info" style="flex:1;min-width:0"><strong>${esc(p.name)}</strong><p>${esc($('info-desc').textContent||'')}</p></div><button class="gx-x" id="gx-x" aria-label="Đóng">✕</button></div><div class="gx-row"><button class="btn primary" id="gx-to" style="flex:1">Chỉ đường đến đây</button></div>`}
+  else if(rTo>=0&&state.points[rTo]){const eta=document.querySelector('#r-sum .eta');const lkc=document.querySelector('#r-sum .lkc');const go_=$('r-go');const mw=$('m-walk'),md=$('m-drive');
+   html=(lkc?lkc.outerHTML.replace(/id="lk-/g,'data-k="lk-'):'')+`<div class="gx-row"><div style="flex:1;min-width:0"><div class="gx-eta">${eta?eta.innerHTML:esc($('r-sum').textContent.slice(0,80))}</div><div class="gx-to">Đến <b>${esc(state.points[rTo].name)}</b></div></div><button class="gx-x" id="gx-x" aria-label="Bỏ chỉ đường">✕</button></div>`+
+    (!$('r-modes').hidden?`<div class="gx-modes"><button data-k="m-walk" aria-pressed="${mw.getAttribute('aria-pressed')}">🚶 ${esc($('m-walk-t').textContent)}</button><button data-k="m-drive" aria-pressed="${md.getAttribute('aria-pressed')}" ${md.disabled?'disabled':''}>🛵🚗 ${esc($('m-drive-t').textContent)}</button></div>`:'')+
+    `<div class="gx-row"><button class="btn" id="gx-more">📋 Xem từng bước</button>${go_?`<button class="btn primary" data-k="r-go" style="flex:1">${esc(go_.textContent)}</button>`:''}</div>`}
+  else html=`<button class="gx-search" id="gx-s">🔍 Bạn muốn đi đâu?</button><div class="gx-chips">${CH.map((c,i)=>`<button data-c="${i}">${c[0]} ${c[1]}</button>`).join('')}</div>`;
+  pk.innerHTML=html;
+  pk.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const c=CH[+b.dataset.c];go(c[2]==='wc'?nearestWC():P(c[2]))});
+  pk.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const t=$(b.dataset.k);if(t&&!t.disabled)t.click();setTimeout(gx,60)});
+  const s_=$('gx-s');if(s_)s_.onclick=()=>{setS('open');setTimeout(()=>$('r-to').focus(),100)};
+  const m=$('gx-more');if(m)m.onclick=()=>{setS('open');const d=document.querySelector('#r-sum .steps');if(d)d.open=true};
+  const t=$('gx-to');if(t)t.onclick=()=>{$('info-to').click();setS('peek');setTimeout(gx,60)};
+  const x=$('gx-x');if(x)x.onclick=()=>{if(!info.hidden){info.hidden=true}else{rTo=-1;meFollow=false;fillRouteSelects();drawRoute();gRoute.innerHTML='';gRoutePins.innerHTML='';gRouteGhost.innerHTML='';$('navb').hidden=true}setTimeout(gx,0)}}finally{busy=false}}
+ window.gx=gx;
+ const mo=()=>{if(app.dataset.s!=='open')setTimeout(gx,0)};
+ new MutationObserver(mo).observe($('r-sum'),{childList:true,subtree:true});
+ new MutationObserver(mo).observe($('info'),{attributes:true,attributeFilter:['hidden']});
+ setS('peek');gx();
+ // open at the park itself, not its surroundings
+ const home=()=>{const Q=state.points.flatMap(q=>fromLL(q.lat,q.lon));frameW(Q.concat([420,820,440,770,700,1090,1240,900]),24,0.05)};setTimeout(home,80);setTimeout(home,400);$('zfit').onclick=home;
+})();
 </script>
 
 </body></html>
